@@ -574,5 +574,16 @@ function boot(){if(booted)return;booted=true;
 }
 })();
 </script>
+<!-- Back to YZO Portals -->
+<a href="https://yzo-portals.netlify.app/" id="yzoBack" aria-label="Back to YZO Portals main page">← YZO Portals</a>
+<style>
+#yzoBack{position:fixed;left:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:9999;
+  display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:999px;
+  background:#16304A;color:#fff;font:600 14px/1 'Barlow',system-ui,'Segoe UI',sans-serif;
+  text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.15)}
+#yzoBack:hover{background:#0D7C87}
+#yzoBack:focus-visible{outline:3px solid #3FB6C1;outline-offset:2px}
+@media print{#yzoBack{display:none}}
+</style>
 </body>
 </html>
