@@ -1,0 +1,32 @@
+[
+  {
+    "doc": "manual",
+    "version": "9.26",
+    "effectiveDate": "2026-09-14",
+    "notes": "Draft sent to OU for review (29 Sep 2026).",
+    "file": "files/manual-9.26-Driver_Manual_Draft_29_Sep_2026.docx",
+    "fileName": "Driver_Manual_v9.26_Draft_29_Sep_2026.docx",
+    "uploadedAt": "2026-09-29T00:00:00Z",
+    "uploadedByLabel": "Fleet Management"
+  },
+  {
+    "doc": "rental",
+    "version": "Final (STRM)",
+    "effectiveDate": "",
+    "notes": "Final agreement template for signing (October 2026), with the driver rules annex.",
+    "file": "files/rental-Final-STRM-Motor_Vehicle_Rental_Agreement.docx",
+    "fileName": "Motor_Vehicle_Rental_Agreement_Final_STRM.docx",
+    "uploadedAt": "2026-10-14T00:00:00Z",
+    "uploadedByLabel": "Fleet Management"
+  },
+  {
+    "doc": "rental",
+    "version": "The Final",
+    "effectiveDate": "",
+    "notes": "Annex reframed as lessor service standards; protest ban and fuel slip rule removed; confidential bribery reporting added; clauses renumbered; invoice clause, 12.2 and 13.2 removed; labour-law sentence removed from 5.3.",
+    "file": "files/rental-The-Final-Motor_Vehicle_Rental_Agreement.docx",
+    "fileName": "Motor_Vehicle_Rental_Agreement_The_Final.docx",
+    "uploadedAt": "2026-10-16T09:40:00Z",
+    "uploadedByLabel": "Fleet Management"
+  }
+]
