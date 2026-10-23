@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Impl-Ops</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗂️</text></svg>">
+<link rel="preconnect" href="https://uemxuinndpaazwxayecv.supabase.co" crossorigin><link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+/* ===================== SETTINGS — edit only this part ===================== */
+const CONFIG = {
+  title: "Impl-Ops",
+  subtitle: "All work portals in one place",
+  // Paste your Supabase details here (keep the quote marks).
+  // Leave empty to use "this browser only" mode.
+  SUPABASE_URL: "https://uemxuinndpaazwxayecv.supabase.co",
+  SUPABASE_KEY: "sb_publishable_OLHjd18Q8zjcOgr-wPMjWA_w0f0huZf",  // the publishable / anon public key — never the secret key
+  // The email of the editor account you create in Supabase (Authentication → Users).
+  EDITOR_EMAIL: "mgprotocol@gmail.com"
+};
+// Edit password before Supabase is connected (stored scrambled, not as plain text).
+const EDIT_PASSWORD_HASH = "08ed1a9b5d8bc74260aa6df48e5e4c4f1e0e81db1e33606553eeae22d65e39e6";
+/* ========================================================================== */
+</script>
+<style>
+:root{
+  --bg:#EAEFF2;--surface:#FFFFFF;--ink:#16304A;--muted:#5B6D7D;--line:#D2DAE0;
+  --rail:#16304A;--rail-ink:#DCE7EF;--fiber:#0D7C87;--fiber-soft:#D6EEF0;
+  --amber:#B86E00;--amber-soft:#FBEBD2;--fault:#B3392D;--fault-soft:#F8DEDA;
+  --sans:'Barlow',system-ui,'Segoe UI','Myanmar Text','Padauk',sans-serif;
+  --cond:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F1A24;--surface:#16232F;--ink:#E3ECF2;--muted:#93A6B6;--line:#2A3A48;
+  --rail:#0B141C;--rail-ink:#C9D7E2;--fiber:#3FB6C1;--fiber-soft:#133A40;
+  --amber:#E6A23C;--amber-soft:#3A2C14;--fault:#E3746A;--fault-soft:#3D1F1C;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1A24;--surface:#16232F;--ink:#E3ECF2;--muted:#93A6B6;--line:#2A3A48;
+  --rail:#0B141C;--rail-ink:#C9D7E2;--fiber:#3FB6C1;--fiber-soft:#133A40;
+  --amber:#E6A23C;--amber-soft:#3A2C14;--fault:#E3746A;--fault-soft:#3D1F1C;color-scheme:dark}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 var(--sans)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--fiber);outline-offset:2px}
+
+/* Header rail */
+.rail{background:var(--rail);color:var(--rail-ink)}
+.rail-in{max-width:1080px;margin:0 auto;padding:28px 20px 24px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.rail h1{margin:0;font:700 clamp(2.2rem,6vw,3.4rem)/1 var(--cond);letter-spacing:-.01em;color:#fff}
+.rail p{margin:6px 0 0;color:var(--rail-ink);opacity:.8}
+.rail-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--fiber)}
+.btn.primary{background:var(--fiber);border-color:var(--fiber);color:#fff}
+.btn.ghost{background:transparent;color:var(--rail-ink);border-color:rgba(220,231,239,.35)}
+.btn.ghost:hover{border-color:var(--rail-ink)}
+.btn.danger{color:var(--fault);border-color:var(--fault)}
+
+main{max-width:1080px;margin:0 auto;padding:20px 20px 60px}
+.notice{background:var(--amber-soft);color:var(--ink);border-left:4px solid var(--amber);padding:10px 14px;border-radius:6px;margin-bottom:18px;font-size:.95rem}
+.toolbar{display:flex;gap:10px;margin-bottom:22px}
+.search{flex:1;min-width:0;padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+
+/* Portal groups */
+.group{margin-bottom:30px}
+.group h2{font:600 1.35rem/1.2 var(--cond);margin:0 0 10px;color:var(--muted);display:flex;gap:10px;align-items:baseline}
+.group h2 span{font:500 .9rem var(--sans)}
+.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.portal{position:relative;display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--c,var(--fiber));border-radius:8px;padding:14px 16px;text-decoration:none;color:inherit;min-height:84px}
+.portal:hover{border-color:var(--c,var(--fiber));border-left-color:var(--c,var(--fiber))}
+.portal .ic{font-size:1.8rem;line-height:1;flex:none;width:44px;height:44px;display:grid;place-items:center;border-radius:8px;background:var(--bg)}
+.portal .tx{min-width:0;flex:1}
+.portal b{display:block;font:600 1.3rem/1.15 var(--cond)}
+.portal small{display:block;color:var(--muted);font-size:.92rem;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.edit-tools{display:none;gap:6px;flex:none}
+.editing .edit-tools{display:flex}
+.mini{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:.85rem;font-weight:600}
+.mini:hover{border-color:var(--fiber)}
+.empty{background:var(--surface);border:2px dashed var(--line);border-radius:10px;padding:40px 20px;text-align:center;color:var(--muted)}
+.empty b{display:block;font:600 1.5rem var(--cond);color:var(--ink);margin-bottom:6px}
+
+/* Dialog */
+dialog{border:none;border-radius:12px;padding:0;background:var(--surface);color:var(--ink);width:min(520px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog::backdrop{background:rgba(10,20,30,.55)}
+.dlg{padding:22px}
+.dlg h3{margin:0 0 16px;font:700 1.7rem var(--cond)}
+.field{margin-bottom:14px}
+.field label{display:block;font-weight:600;font-size:.92rem;margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.field .hint{font-size:.82rem;color:var(--muted);margin-top:3px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.sw{width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer;background:var(--s)}
+.sw[aria-pressed="true"]{border-color:var(--ink)}
+.dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.err{color:var(--fault);font-size:.9rem;min-height:1.2em}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--rail);color:#fff;padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+@media (max-width:520px){.row{grid-template-columns:1fr}.rail-in{padding-top:20px}}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<header class="rail">
+  <div class="rail-in">
+    <div>
+      <h1 id="title"></h1>
+      <p id="subtitle"></p>
+    </div>
+    <div class="rail-actions">
+      <button class="btn ghost" id="editBtn" type="button">Edit portals</button>
+      <button class="btn primary" id="addBtn" type="button" hidden>+ New portal</button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="notice" id="notice" hidden></div>
+  <div class="toolbar"><input class="search" id="search" type="search" placeholder="Find a portal…" aria-label="Find a portal"></div>
+  <div id="groups"><p style="color:var(--muted)">Loading portals…</p></div>
+</main>
+
+<!-- Add / edit portal -->
+<dialog id="portalDlg">
+  <form class="dlg" id="portalForm" method="dialog">
+    <h3 id="dlgTitle">New portal</h3>
+    <div class="field"><label for="fName">Portal name</label><input id="fName" required maxlength="60" placeholder="Box Ops Daily Portal"></div>
+    <div class="field"><label for="fUrl">Link</label><input id="fUrl" required placeholder="https://yzofinancial.netlify.app"><div class="hint">Copy the link from your browser’s address bar.</div></div>
+    <div class="field"><label for="fDesc">Short description</label><input id="fDesc" maxlength="120" placeholder="Daily box operations and fault reports"></div>
+    <div class="row">
+      <div class="field"><label for="fCat">Group</label><input id="fCat" list="cats" maxlength="40" placeholder="Finance"><datalist id="cats"></datalist></div>
+      <div class="field"><label for="fIcon">Icon (emoji)</label><input id="fIcon" maxlength="4" placeholder="📊"></div>
+    </div>
+    <div class="field"><label>Color</label><div class="swatches" id="swatches"></div></div>
+    <div class="field"><label for="fOrder">Position</label><input id="fOrder" type="number" placeholder="1"><div class="hint">Smaller numbers appear first.</div></div>
+    <div class="err" id="formErr"></div>
+    <div class="dlg-actions">
+      <button class="btn danger" id="delBtn" type="button" hidden>Delete</button>
+      <button class="btn" type="button" id="cancelBtn">Cancel</button>
+      <button class="btn primary" type="submit" id="saveBtn">Save portal</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Sign in -->
+<dialog id="loginDlg">
+  <form class="dlg" id="loginForm" method="dialog">
+    <h3>Enter edit password</h3>
+    <div class="field"><label for="lPass">Password</label><input id="lPass" type="password" required autocomplete="current-password"></div>
+    <div class="err" id="loginErr"></div>
+    <div class="dlg-actions">
+      <button class="btn" type="button" id="loginCancel">Cancel</button>
+      <button class="btn primary" type="submit">Sign in</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const COLORS = ["#0D7C87","#16304A","#B86E00","#2E7D4F","#B3392D","#6B4FA0","#3A6EA5","#7A6A55"];
+const LOCAL_KEY = "yzo-portals";
+const useCloud = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_KEY && window.supabase);
+const db = useCloud ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY) : null;
+
+let portals = [], editing = false, signedIn = false, currentId = null, pickedColor = COLORS[0];
+
+document.title = CONFIG.title;
+$("#title").textContent = CONFIG.title;
+$("#subtitle").textContent = CONFIG.subtitle;
+
+if (!useCloud) {
+  const n = $("#notice");
+  n.hidden = false;
+  n.textContent = "Portals you add are saved on this browser only. Connect Supabase in the settings so your whole team sees the same list.";
+}
+
+/* ---------- data ---------- */
+const CACHE_KEY = "impl-ops-portals-cache";
+async function load() {
+  if (useCloud) {
+    // Show the last saved list instantly, then refresh it in the background
+    let shown = false;
+    if (!portals.length) {
+      try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); if (Array.isArray(c) && c.length) { portals = c; render(); shown = true; } } catch {}
+    }
+    const { data, error } = await db.from("portals").select("*").order("sort_order").order("name");
+    if (error) { if (!shown) showError("Couldn’t load portals: " + error.message + ". Check the Supabase link and key in the settings."); return; }
+    portals = data || [];
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(portals)); } catch {}
+  } else {
+    try { portals = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]"); } catch { portals = []; }
+  }
+  render();
+}
+function saveLocal(){ try { localStorage.setItem(LOCAL_KEY, JSON.stringify(portals)); } catch {} }
+
+async function upsert(p) {
+  if (useCloud) {
+    const { id, ...fields } = p;
+    const q = id ? db.from("portals").update(fields).eq("id", id) : db.from("portals").insert(fields);
+    const { error } = await q;
+    if (error) throw error;
+    await load();
+  } else {
+    if (p.id) portals = portals.map(x => x.id === p.id ? p : x);
+    else portals.push({ ...p, id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) });
+    saveLocal(); render();
+  }
+}
+async function remove(id) {
+  if (useCloud) {
+    const { error } = await db.from("portals").delete().eq("id", id);
+    if (error) throw error;
+    await load();
+  } else { portals = portals.filter(x => x.id !== id); saveLocal(); render(); }
+}
+
+/* ---------- render ---------- */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const safeUrl = u => /^https?:\/\//i.test(u) ? u : "#";
+
+function render() {
+  const q = $("#search").value.trim().toLowerCase();
+  const list = portals
+    .filter(p => !q || [p.name, p.description, p.category].join(" ").toLowerCase().includes(q))
+    .sort((a,b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name));
+  const box = $("#groups");
+  $("#cats").innerHTML = [...new Set(portals.map(p => p.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join("");
+
+  if (!portals.length) {
+    box.innerHTML = `<div class="empty"><b>No portals yet</b>Click “Edit portals”, then “+ New portal” to add your first one.</div>`;
+    return;
+  }
+  if (!list.length) { box.innerHTML = `<div class="empty"><b>No match</b>No portal matches “${esc(q)}”.</div>`; return; }
+
+  const groups = {};
+  list.forEach(p => (groups[p.category || "General"] ??= []).push(p));
+  box.innerHTML = Object.entries(groups).map(([cat, items]) => `
+    <section class="group">
+      <h2>${esc(cat)} <span>${items.length} portal${items.length > 1 ? "s" : ""}</span></h2>
+      <div class="list">
+        ${items.map(p => `
+          <a class="portal" href="${esc(safeUrl(p.url))}" style="--c:${esc(p.color || COLORS[0])}" data-id="${esc(p.id)}">
+            <span class="ic" aria-hidden="true">${esc(p.icon || "📁")}</span>
+            <span class="tx"><b>${esc(p.name)}</b>${p.description ? `<small>${esc(p.description)}</small>` : ""}</span>
+            <span class="edit-tools"><button class="mini" type="button" data-edit="${esc(p.id)}">Edit</button></span>
+          </a>`).join("")}
+      </div>
+    </section>`).join("");
+}
+
+function showError(msg){ $("#groups").innerHTML = `<div class="empty"><b>Something went wrong</b>${esc(msg)}</div>`; }
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2200); }
+
+/* ---------- edit mode ---------- */
+function setEditing(on) {
+  editing = on;
+  document.body.classList.toggle("editing", on);
+  $("#addBtn").hidden = !on;
+  $("#editBtn").textContent = on ? "Done editing" : "Edit portals";
+}
+$("#editBtn").onclick = () => {
+  if (editing) { setEditing(false); return; }
+  if (!signedIn) { $("#loginErr").textContent = ""; $("#lPass").value = ""; $("#loginDlg").showModal(); return; }
+  setEditing(true);
+};
+
+/* ---------- edit password ---------- */
+if (useCloud) {
+  const isEditor = s => !!(s && s.user && s.user.email === CONFIG.EDITOR_EMAIL);
+  db.auth.getSession().then(({ data }) => { signedIn = isEditor(data.session); });
+  db.auth.onAuthStateChange((_e, session) => { signedIn = isEditor(session); });
+} else {
+  try { signedIn = sessionStorage.getItem("yzo-edit") === "1"; } catch {}
+}
+async function sha256(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+$("#loginCancel").onclick = () => $("#loginDlg").close();
+$("#loginForm").onsubmit = async e => {
+  e.preventDefault();
+  const pass = $("#lPass").value;
+  $("#loginErr").textContent = "Checking…";
+  if (useCloud) {
+    if (!CONFIG.EDITOR_EMAIL) { $("#loginErr").textContent = "Add the editor email in the settings first."; return; }
+    const { error } = await db.auth.signInWithPassword({ email: CONFIG.EDITOR_EMAIL, password: pass });
+    if (error) { $("#loginErr").textContent = "Wrong password. Try again."; return; }
+  } else {
+    if ((await sha256(pass)) !== EDIT_PASSWORD_HASH) { $("#loginErr").textContent = "Wrong password. Try again."; return; }
+    try { sessionStorage.setItem("yzo-edit", "1"); } catch {}
+  }
+  signedIn = true; $("#loginDlg").close(); setEditing(true); toast("Edit mode on");
+};
+
+/* ---------- portal form ---------- */
+function drawSwatches() {
+  $("#swatches").innerHTML = COLORS.map(c => `<button type="button" class="sw" style="--s:${c}" data-c="${c}" aria-label="Color ${c}" aria-pressed="${c === pickedColor}"></button>`).join("");
+}
+$("#swatches").onclick = e => { const c = e.target.dataset.c; if (c) { pickedColor = c; drawSwatches(); } };
+
+function openForm(p) {
+  currentId = p?.id || null;
+  $("#dlgTitle").textContent = p ? "Edit portal" : "New portal";
+  $("#fName").value = p?.name || "";
+  $("#fUrl").value = p?.url || "";
+  $("#fDesc").value = p?.description || "";
+  $("#fCat").value = p?.category || "";
+  $("#fIcon").value = p?.icon || "";
+  $("#fOrder").value = p?.sort_order ?? (portals.length + 1);
+  pickedColor = p?.color || COLORS[portals.length % COLORS.length];
+  $("#delBtn").hidden = !p;
+  $("#formErr").textContent = "";
+  drawSwatches();
+  $("#portalDlg").showModal();
+}
+$("#addBtn").onclick = () => openForm(null);
+$("#cancelBtn").onclick = () => $("#portalDlg").close();
+
+$("#groups").addEventListener("click", e => {
+  const id = e.target.dataset?.edit;
+  if (id) { e.preventDefault(); openForm(portals.find(p => String(p.id) === id)); return; }
+  if (editing && e.target.closest(".portal")) e.preventDefault(); // don’t leave the page while editing
+});
+
+$("#portalForm").onsubmit = async e => {
+  e.preventDefault();
+  let url = $("#fUrl").value.trim();
+  if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
+  const p = {
+    name: $("#fName").value.trim(),
+    url,
+    description: $("#fDesc").value.trim(),
+    category: $("#fCat").value.trim() || "General",
+    icon: $("#fIcon").value.trim() || "📁",
+    color: pickedColor,
+    sort_order: parseInt($("#fOrder").value, 10) || 0
+  };
+  if (!p.name || !p.url) { $("#formErr").textContent = "Add a portal name and a link."; return; }
+  if (currentId) p.id = currentId;
+  $("#saveBtn").disabled = true;
+  try { await upsert(p); $("#portalDlg").close(); toast(currentId ? "Portal updated" : "Portal added"); }
+  catch (err) { $("#formErr").textContent = "Couldn’t save: " + err.message; }
+  finally { $("#saveBtn").disabled = false; }
+};
+
+$("#delBtn").onclick = async () => {
+  const p = portals.find(x => x.id === currentId);
+  if (!p || !confirm(`Delete “${p.name}” from the list? The portal website itself won’t be affected.`)) return;
+  try { await remove(currentId); $("#portalDlg").close(); toast("Portal deleted"); }
+  catch (err) { $("#formErr").textContent = "Couldn’t delete: " + err.message; }
+};
+
+$("#search").addEventListener("input", render);
+load();
+</script>
+</body>
+</html>
