@@ -71,6 +71,7 @@ button,input,select{font:inherit;color:inherit}
 .seg button{border:0;background:transparent;padding:7px 14px;cursor:pointer;font-weight:500}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
 #themeSeg button{padding:7px 11px}
+#citySeg button{padding:7px 12px;font-weight:600}
 .btn{border:1px solid var(--ink);background:var(--ink);color:var(--surface);padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
 .btn.danger{background:transparent;color:var(--red);border-color:var(--red)}
@@ -241,7 +242,7 @@ th.pk{color:var(--muted);font-weight:500}
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <h1>Yangon FTTx operations</h1>
+      <h1 id="brandTitle">Yangon FTTx operations</h1>
       <p id="subtitle">Daily site-done reports, last 30 days (offline file)</p>
     </div>
     <div class="actions">
@@ -250,6 +251,7 @@ th.pk{color:var(--muted);font-weight:500}
         <button type="button" data-theme-set="dark" aria-pressed="false" title="Dark mode">☾ Dark</button>
         <button type="button" data-theme-set="pink" aria-pressed="false" title="Pink mode">✿ Pink</button>
       </div>
+      <div class="seg" id="citySeg" role="group" aria-label="City"></div>
       <button class="btn ghost" id="goReports" type="button">📄 Reports</button>
       <button class="btn" id="goUpload">Upload daily file</button>
     </div>
@@ -282,9 +284,21 @@ th.pk{color:var(--muted);font-weight:500}
 (function(){
 "use strict";
 /* ---------- state ---------- */
-const S={days:{},mode:"day",sel:null,tab:"daily",db:null,canWrite:true,loaded:false,pending:[],netOnlyRep:true,netQ:""};
+const S={city:(()=>{try{return localStorage.getItem("fttx-city")||"YGN";}catch(e){return"YGN";}})(),days:{},mode:"day",sel:null,tab:"daily",db:null,canWrite:true,loaded:false,pending:[],netOnlyRep:true,netQ:""};
 const charts={};
-let ALL=[];          // flattened rows with date + time
+let ALL=[];          // flattened rows with date + time, for the selected city
+let ALLF=[];         // all cities
+// City: Yangon rows have CA2 Region R1 / R1S / R2 / R2S; other cities use their code (BOB, MAM, MYW, TOB...)
+const YGN_REG=/^R[12]S?$/i;
+function cityOf(r){if(r.cy)return r.cy;const g=String(r.r||"").trim().toUpperCase();if(!g||YGN_REG.test(g))return"YGN";return g;}
+const CITY_NAME={YGN:"Yangon"};
+function cityList(){const c=count(ALLF,r=>r.cy).map(x=>x[0]);return c.sort((a,b)=>(a==="YGN"?-1:b==="YGN"?1:a.localeCompare(b)));}
+function applyCity(){
+  const cs=cityList();if(S.city!=="All"&&!cs.includes(S.city))S.city=cs.includes("YGN")?"YGN":"All";
+  ALL=S.city==="All"?ALLF:ALLF.filter(r=>r.cy===S.city);
+  S.cdays=new Set(ALL.map(r=>r.d));
+}
+const hasDay=d=>!!(S.cdays&&S.cdays.has(d));
 const $=s=>document.querySelector(s);
 const el=(t,a={},...kids)=>{const e=document.createElement(t);for(const k in a){if(k==="class")e.className=a[k];else if(k==="text")e.textContent=a[k];else if(a[k]!=null)e.setAttribute(k,a[k]);}kids.flat().forEach(c=>c!=null&&e.append(c));return e;};
 
@@ -388,15 +402,16 @@ const PORT_MAX=500; // a port count above this is treated as a typing error
 
 /* ---------- derived data ---------- */
 function rebuild(){
-  ALL=[];
+  const ALL=[];
   for(const d of Object.keys(S.days).sort()){
     const dn=dnum(d);
     S.days[d].rows.forEach((r,i)=>{
       const b0=portNum(r.pb),a0=portNum(r.pa),bad=(b0!=null&&b0>PORT_MAX)||(a0!=null&&a0>PORT_MAX),b=bad?null:b0,a=bad?null:a0;
-      ALL.push(Object.assign({d,dn,i,t:dn*1440+(r.ar!=null?r.ar:i*0.01),pbn:b,pan:a,diff:(b!=null&&a!=null)?a-b:null,badPort:bad,st:status(r),cg:catGroup(r.cat),tg:teamType(r.te)},r));
+      ALL.push(Object.assign({d,dn,i,t:dn*1440+(r.ar!=null?r.ar:i*0.01),pbn:b,pan:a,diff:(b!=null&&a!=null)?a-b:null,badPort:bad,st:status(r),cg:catGroup(r.cat),cy:cityOf(r),tg:r.te?teamType(r.te):(cityOf(r)!=="YGN"?cityOf(r)+" team":teamType(r.te))},r));
     });
   }
   ALL.sort((x,y)=>x.t-y.t);
+  ALLF=ALL;applyCity();
 }
 const TEAM_ORDER=["FTTx-Ops 1","FTTx-Ops 2","Fiber","Fiber W","Project Box Maint","Box Maint","Relocation"];
 function teamType(t){t=(t||"").trim();if(!t)return "(no team)";const m=t.match(/^ft?t[hx]\s*[-_ ]?\s*ops\s*[-_ ]?\s*(\d+)$/i);if(m)return "FTTx-Ops "+m[1];if(/^fiber\s*w$/i.test(t))return "Fiber W";if(/^fiber$/i.test(t))return "Fiber";return t;}
@@ -404,7 +419,8 @@ const tsort=(a,b)=>{const i=TEAM_ORDER.indexOf(a),j=TEAM_ORDER.indexOf(b);return
 function catGroup(c){c=c||"";if(/box\s*maint|badexp|relocation/i.test(c))return"Box-Maint";if(/complain/i.test(c))return"Complaint";if(/activity|olt[\s\-_]*sfp/i.test(c))return"Activity";if(/(ca1|ca2)\s*(broken|high\s*loss)|no\s*link/i.test(c))return"Site Down";return"Other";}
 // Backend Status (AS): contains "pending" = pending; blank = no status; anything else = resolved
 function status(r){const b=(r.be||"").toLowerCase().trim();if(!b)return "none";if(/pending/.test(b))return "pend";return "ok";}
-const dates=()=>Object.keys(S.days).sort();
+const allDates=()=>Object.keys(S.days).sort();
+const dates=()=>allDates().filter(hasDay);
 const latest=()=>{const d=dates();return d[d.length-1]||null;};
 function windowDates(n,end){end=end||S.sel||latest();if(!end)return[];const e=dnum(end);return dates().filter(d=>{const x=dnum(d);return x<=e&&x>e-n;});}
 function rangeDates(){return S.mode==="day"?(S.sel?[S.sel]:[]):windowDates(+S.mode);}
@@ -509,7 +525,7 @@ function renderStrip(){
   const per={};ALL.forEach(r=>{(per[r.d]=per[r.d]||{ok:0,pend:0,none:0})[r.st]++;});
   const max=Math.max(1,...Object.values(per).map(p=>p.ok+p.pend+p.none));
   for(let i=29;i>=0;i--){
-    const d=dstr(e-i),p=per[d],has=!!S.days[d];
+    const d=dstr(e-i),p=per[d],has=hasDay(d);
     const b=el("button",{class:"cell"+(inR.has(d)?" inrange":""),type:"button","aria-label":nice(d)+(has?": "+(p.ok+p.pend+p.none)+" sites":": no upload")});
     if(!has)b.disabled=true;
     if(d===S.sel)b.setAttribute("aria-current","true");
@@ -522,7 +538,18 @@ function renderStrip(){
   $("#stripTitle").textContent="Sites done per day, "+nice(dstr(e-29))+" to "+nice(end);
 }
 
+function renderCity(){
+  const box=$("#citySeg");if(!box)return;box.textContent="";
+  const cs=cityList();
+  if(cs.length<2&&S.city!=="All"){box.hidden=true;}else box.hidden=false;
+  ["All"].concat(cs).forEach(c=>{const b=el("button",{type:"button","aria-pressed":String(S.city===c),title:c==="All"?"All cities":(CITY_NAME[c]||c),text:c==="All"?"All cities":c});
+    b.addEventListener("click",()=>{S.city=c;try{localStorage.setItem("fttx-city",c);}catch(e){}applyCity();if(S.sel&&!hasDay(S.sel))S.sel=latest();render();});box.append(b);});
+  const t=$("#brandTitle");if(t)t.textContent=S.city==="All"?"FTTx operations: all cities":S.city==="YGN"?"Yangon FTTx operations":S.city+" FTTx operations";
+  const sub=$("#subtitle");if(sub&&!sub.dataset.base)sub.dataset.base=sub.textContent;
+  if(sub)sub.textContent=sub.dataset.base+(S.city==="YGN"?" · Regions R1, R1S, R2, R2S":S.city==="All"?" · Yangon and other cities":" · "+S.city+" only");
+}
 function render(){
+  renderCity();
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===S.tab)));
   renderStrip();
   Object.keys(charts).forEach(k=>{charts[k].destroy();delete charts[k];});
@@ -788,7 +815,7 @@ function daily(P){
   const sel=el("input",{type:"date","aria-label":"Choose date",value:D,min:ds[0]||"",max:ds[ds.length-1]||""});
   sel.addEventListener("change",()=>{if(sel.value){S.sel=sel.value;render();}});
   const lt=el("button",{class:"btn ghost",type:"button",text:"Latest day"});lt.disabled=D===latest();lt.addEventListener("click",()=>{S.sel=latest();render();});
-  const has=!!S.days[D];
+  const has=hasDay(D);
   ensureRptCss();
   const rptHost=el("div");
   const title=el("h2",{class:"dayh",text:"Dashboard: "+nice(D)+" "+D.slice(0,4)});if(D===latest())title.append(" ",tag("ok","Latest day"));
@@ -878,7 +905,7 @@ function dayBar(extra,extraBtn){
   wrap.append(el("span",{class:"pl",text:D?(D===latest()?"Today: ":"")+nice(D)+" "+D.slice(0,4):"No date"}),el("label",{class:"note"},"Date ",di),pb,nb,lt);
   if(extraBtn)wrap.append(extraBtn);
   const box=el("div",{},wrap);
-  if(D&&!S.days[D])box.append(el("p",{class:"msg err",text:"No report uploaded for "+nice(D)+". Pick another date."}));
+  if(D&&!hasDay(D))box.append(el("p",{class:"msg err",text:"No "+(S.city==="All"?"":S.city+" ")+"data for "+nice(D)+". Pick another date."}));
   if(extra)box.append(el("p",{class:"ctx",text:extra}));
   return box;
 }
@@ -1002,7 +1029,7 @@ async function startLocal(){
     await localReload();
   }catch(e){S.loaded=true;render();const P=$("#panel");P.prepend(el("p",{class:"msg err",text:"This browser blocked local storage ("+(e&&e.message||e)+"). Open the file in Chrome or Edge."}));}
 }
-async function exportBackup(msg){const dl=await claude_use("downloads");const docs=dates().map(d=>({date:d,part:0,parts:1,file:S.days[d].file||"",uploadedAt:S.days[d].uploadedAt||"",rows:S.days[d].rows}));try{await dl.save({filename:"FTTx_portal_backup_"+(latest()||"empty")+".json",data:JSON.stringify(docs)});msg.textContent="Backup saved.";}catch(e){msg.textContent="Backup cancelled.";}}
+async function exportBackup(msg){const dl=await claude_use("downloads");const docs=allDates().map(d=>({date:d,part:0,parts:1,file:S.days[d].file||"",uploadedAt:S.days[d].uploadedAt||"",rows:S.days[d].rows}));try{await dl.save({filename:"FTTx_portal_backup_"+(latest()||"empty")+".json",data:JSON.stringify(docs)});msg.textContent="Backup saved.";}catch(e){msg.textContent="Backup cancelled.";}}
 async function importBackup(file,msg){try{const docs=JSON.parse(await file.text());if(!Array.isArray(docs))throw new Error("not a portal backup");for(const v of docs){if(v&&v.date&&Array.isArray(v.rows))await writeDay(v.date,v.rows,v.file||"backup");}msg.textContent="Restored "+docs.length+" days.";}catch(e){msg.textContent="Could not restore: "+e.message;}}
 function reportButton(host,get){
   const gen=el("button",{class:"btn",type:"button",text:"Generate report"});
@@ -1019,7 +1046,7 @@ function reportButton(host,get){
 function ensureRptCss(){const rc=document.getElementById("rptcss");if(rc&&!rc.textContent)rc.textContent=RPT_CSS.replace(/^body\{[^}]*\}/,"");}
 function summary(P){
   ensureRptCss();
-  const D=S.sel,ds=S.days[D]?[D]:[],R=rowsFor(ds),prevD=dates().filter(d=>d<D).pop(),PR=prevD?rowsFor([prevD]):[];
+  const D=S.sel,ds=hasDay(D)?[D]:[],R=rowsFor(ds),prevD=dates().filter(d=>d<D).pop(),PR=prevD?rowsFor([prevD]):[];
   const rptHost=el("div");
   P.append(dayBar(prevD?"Arrows compare with "+nice(prevD)+".":"",reportButton(rptHost,()=>({R,PR,ds,opt:{label:nice(D)+" "+D.slice(0,4),prevName:prevD?nice(prevD):"previous day",tag:D}}))));
   P.append(rptHost);
@@ -1266,8 +1293,8 @@ function rpRows(){
 function rpBuild(){
   const C=rpRows(),{ds,R,RA,PR,T}=C,D=reportData(R,PR,ds),root=el("div",{class:"rpt"}),sheets=[];
   const label=RP.from===RP.to?nice(RP.from)+" "+RP.from.slice(0,4):nice(RP.from)+" to "+nice(RP.to)+" "+RP.to.slice(0,4);
-  const filt=[RP.regs.length?"Region: "+RP.regs.join(", "):"",RP.grps.length?"Group: "+RP.grps.join(", "):"",RP.teams.length?"Team: "+RP.teams.join(", "):""].filter(Boolean).join(" · ");
-  root.append(el("h1",{text:RP.title||("Yangon FTTx "+RP_PRESETS[RP.type].label.toLowerCase()+" report")}),el("p",{class:"meta",text:label+" ("+ds.length+" day"+(ds.length===1?"":"s")+" with data)"+(filt?". Filter: "+filt:"")+". Generated "+new Date().toLocaleString()+"."}));
+  const filt=[S.city==="All"?"All cities":"City: "+S.city,RP.regs.length?"Region: "+RP.regs.join(", "):"",RP.grps.length?"Group: "+RP.grps.join(", "):"",RP.teams.length?"Team: "+RP.teams.join(", "):""].filter(Boolean).join(" · ");
+  root.append(el("h1",{text:RP.title||((S.city==="All"?"All cities":S.city==="YGN"?"Yangon":S.city)+" FTTx "+RP_PRESETS[RP.type].label.toLowerCase()+" report")}),el("p",{class:"meta",text:label+" ("+ds.length+" day"+(ds.length===1?"":"s")+" with data)"+(filt?". Filter: "+filt:"")+". Generated "+new Date().toLocaleString()+"."}));
   const sec=(t,...k)=>root.append(el("h2",{text:t}),...k.filter(Boolean));
   const add=(name,rows)=>sheets.push([name.slice(0,31),rows]);
   const has=k=>RP.secs.includes(k);
@@ -1359,7 +1386,7 @@ function siteStatusCounts(rows){
   const v=dedupBox(rows);return{sites:v.length,ok:v.filter(r=>r.st==="ok").length,pend:v.filter(r=>r.st==="pend").length,none:v.filter(r=>r.st==="none").length};
 }
 function network(P){
-  const D=S.sel,R0=rowsFor(S.days[D]?[D]:[]),W0=rowsFor(windowDates(30,D));
+  const D=S.sel,R0=rowsFor(hasDay(D)?[D]:[]),W0=rowsFor(windowDates(30,D));
   P.append(dayBar("A site is its Box 1 name and is counted once, even if it has several rows. Repeats look back 30 days ending on the chosen date."));
   // ---- group / category filter (applies to the whole tab)
   {const gs=GROUPS.filter(g=>W0.some(r=>r.cg===g));if(SH.grp!=="All"&&!gs.includes(SH.grp))SH.grp="All";
@@ -1605,7 +1632,7 @@ function rc(P){
 
 /* ---------- Uploads ---------- */
 function uploads(P){
-  P.append(el("p",{class:"ctx",text:"Upload the daily planning-raw Excel. The date is read from the sheet name (for example 19-Oct-2026) or the file name; check it before saving. Uploading a day again replaces it."}));
+  P.append(el("p",{class:"ctx",text:"Upload the daily planning-raw Excel. The date is read from the sheet name (for example 19-Oct-2026) or the file name; check it before saving. A file can hold several tabs (for example Yangon Data and R1 Other City Data); each row’s city comes from CA2 Region (R1, R1S, R2, R2S = YGN; BOB, MAM, MYW, TOB… = that city). Uploading a day again replaces only the cities in that file."}));
   const inp=el("input",{type:"file",accept:".xlsx,.xls,.xlsm",multiple:"",style:"display:none",id:"fileIn"});
   const drop=el("div",{class:"drop"},el("p",{},el("b",{text:"Drop Excel files here"})),el("p",{text:"or"}),el("button",{class:"btn",type:"button",text:"Choose files"}),inp);
   if(!S.canWrite)drop.replaceChildren(S.cloud?signInBox():el("p",{text:"You can view this portal but not upload. Ask the owner for edit access."}));
@@ -1629,15 +1656,17 @@ function uploads(P){
         const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
         const sheets=wb.SheetNames.map(n=>({n,d:parseDate(n)}));
         const dated=sheets.filter(s=>s.d);
-        const use=dated.length?dated:[{n:wb.SheetNames[0],d:parseDate(f.name)}];
+        const use=dated.length?dated:wb.SheetNames.map(n=>({n,d:parseDate(f.name)}));
+        const by={},tabs={},errs=[];
         for(const s of use){
           const rows=parseSheet(XLSX.utils.sheet_to_json(wb.Sheets[s.n],{header:1,raw:true,defval:null}));
-          if(!rows){S.pending.push({file:f.name,sheet:s.n,err:"No header row with ‘Engineer Name’ was found."});continue;}
-          if(rows.some(r=>r._d)){
-            const by={};rows.forEach(r=>{const d=r._d||s.d||"";(by[d]=by[d]||[]).push(r);});
-            Object.keys(by).sort().forEach(d=>S.pending.push({file:f.name,sheet:s.n+(d?" (Date column)":" (rows with no date)"),date:d,rows:by[d]}));
-          } else S.pending.push({file:f.name,sheet:s.n,date:s.d||"",rows});
+          if(!rows||!rows.length){errs.push(s.n);continue;}
+          const ygnTab=/yangon|ygn/i.test(s.n);
+          rows.forEach(r=>{const g=String(r.r||"").trim().toUpperCase();r.cy=(ygnTab||YGN_REG.test(g))?"YGN":(g||String(r.tw||"").trim().toUpperCase()||"OTHER");
+            const d=r._d||s.d||"";(by[d]=by[d]||[]).push(r);(tabs[d]=tabs[d]||new Set()).add(s.n);});
         }
+        if(!Object.keys(by).length){S.pending.push({file:f.name,err:"No tab with an ‘Engineer Name’ header row was found."});continue;}
+        Object.keys(by).sort().forEach(d=>S.pending.push({file:f.name,sheet:[...tabs[d]].join(" + "),date:d,rows:by[d],cities:count(by[d],r=>r.cy).map(x=>x[0]+" "+x[1]).join(", ")}));
       }catch(e){S.pending.push({file:f.name,err:"Could not read this file: "+e.message});}
     }
     drawPrev();
@@ -1649,7 +1678,7 @@ function uploads(P){
       const row=el("div",{class:"row"});
       if(p.err){row.append(el("span",{class:"down",text:p.file+": "+p.err}));prev.append(row);return;}
       const di=el("input",{type:"date",value:p.date,"aria-label":"Report date"});di.addEventListener("change",()=>p.date=di.value);
-      row.append(el("b",{text:p.file+" / "+p.sheet}),el("span",{text:p.rows.length+" site rows"}),el("label",{},"Date ",di));
+      row.append(el("b",{text:p.file+" / "+p.sheet}),el("span",{text:p.rows.length+" site rows"+(p.cities?" ("+p.cities+")":"")}),el("label",{},"Date ",di));
       if(p.date&&S.days[p.date])row.append(tag("rep","Replaces saved day"));
       prev.append(row);
     });
@@ -1663,7 +1692,7 @@ function uploads(P){
     if(!S.db){msg.textContent="Saving is not available in this browser.";msg.className="msg err";return;}
     sb.disabled=true;msg.textContent="Saving…";msg.className="msg";
     try{
-      for(const p of ok){await writeDay(p.date,p.rows,p.file);}
+      for(const p of ok){const cs=new Set(p.rows.map(cityOf)),old=S.days[p.date]?S.days[p.date].rows:[],keep=old.filter(r=>!cs.has(cityOf(r)));await writeDay(p.date,keep.concat(p.rows),p.file);}
       msg.textContent="Saved "+ok.map(p=>nice(p.date)).join(", ")+".";msg.className="msg ok";
       S.sel=ok.map(p=>p.date).sort().pop();S.pending=[];
       setTimeout(()=>go("daily"),700);
@@ -1674,8 +1703,8 @@ function uploads(P){
     }
   }
   // stored days
-  const list=dates().slice().reverse().map(d=>({d,n:S.days[d].rows.length,file:S.days[d].file||"",at:S.days[d].uploadedAt||""}));
-  P.append(el("div",{class:"grid",style:"margin-top:18px"},card("Saved days",list.length+" day"+(list.length===1?"":"s")+" stored"+(S.cloud?" · keeps the last "+SBC.keepDays+" days":""),table([{key:"d",label:"Date",render:r=>nice(r.d)+" "+r.d.slice(0,4)},{key:"n",label:"Sites",num:1},{key:"file",label:"File"},{key:"at",label:"Uploaded",fmt:v=>v?new Date(v).toLocaleString():""},{key:"x",label:"",render:r=>{if(!S.canWrite)return"";const b=el("button",{class:"btn danger",type:"button",text:"Delete"});b.addEventListener("click",async()=>{if(!confirm("Delete "+r.d+"?"))return;b.disabled=true;try{await deleteDay(r.d);}catch(e){b.disabled=false;alert("Delete failed: "+(e.message||e.code));}});return b;}}],list,{empty:"No days saved yet."}))));
+  const list=allDates().slice().reverse().map(d=>({d,n:S.days[d].rows.length,cities:count(S.days[d].rows,cityOf).map(x=>x[0]+" "+x[1]).join(", "),file:S.days[d].file||"",at:S.days[d].uploadedAt||""}));
+  P.append(el("div",{class:"grid",style:"margin-top:18px"},card("Saved days",list.length+" day"+(list.length===1?"":"s")+" stored"+(S.cloud?" · keeps the last "+SBC.keepDays+" days":""),table([{key:"d",label:"Date",render:r=>nice(r.d)+" "+r.d.slice(0,4)},{key:"n",label:"Sites",num:1},{key:"cities",label:"Cities"},{key:"file",label:"File"},{key:"at",label:"Uploaded",fmt:v=>v?new Date(v).toLocaleString():""},{key:"x",label:"",render:r=>{if(!S.canWrite)return"";const b=el("button",{class:"btn danger",type:"button",text:"Delete"});b.addEventListener("click",async()=>{if(!confirm("Delete "+r.d+"?"))return;b.disabled=true;try{await deleteDay(r.d);}catch(e){b.disabled=false;alert("Delete failed: "+(e.message||e.code));}});return b;}}],list,{empty:"No days saved yet."}))));
 }
 
 /* ---------- storage ---------- */
