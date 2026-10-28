@@ -1714,7 +1714,7 @@ const mq=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");if
 
 /* ---------- shared storage (Supabase) ---------- */
 const SBC={url:"https://uemxuinndpaazwxayecv.supabase.co",key:"sb_publishable_OLHjd18Q8zjcOgr-wPMjWA_w0f0huZf",
-  uploadEmail:"fttxreport@gmail.com",keepDays:45};
+  uploadEmails:["fttxreport@gmail.com","mgprotocol+fttx@gmail.com"],keepDays:45};
 const seedDocs=()=>{try{return JSON.parse(document.getElementById("seed").textContent||"[]");}catch(e){return[];}};
 const toRow=(id,v)=>({id,date:v.date,part:v.part||0,parts:v.parts||1,file:v.file||"",uploaded_at:v.uploadedAt||new Date().toISOString(),rows:v.rows});
 let cloudT=null;
@@ -1744,7 +1744,7 @@ function signInBox(){
   const b=el("button",{class:"btn",type:"button",text:"Sign in to upload"}),m=el("span",{class:"note",role:"status"});
   const run=async()=>{
     if(!pw.value)return;b.disabled=true;m.textContent="Checking…";
-    const {error}=await S.cloud.auth.signInWithPassword({email:SBC.uploadEmail,password:pw.value});
+    let error=null;for(const em of SBC.uploadEmails){const r=await S.cloud.auth.signInWithPassword({email:em,password:pw.value});error=r.error;if(!error)break;}
     if(error){b.disabled=false;m.textContent="Wrong password. Try again.";return;}
     S.canWrite=true;m.textContent="Signed in.";
     try{if(S.seedOnly){m.textContent="Saving existing days to the shared database…";await migrateSeed();}}catch(e){m.textContent="Could not save existing days: "+(e.message||e);}
@@ -1776,7 +1776,7 @@ async function startCloud(){
 })();
 </script>
 <!-- Back to Impl-Ops -->
-<a href="https://yzo-portals.netlify.app/" id="yzoBack" aria-label="Back to Impl-Ops main page">← Impl-Ops</a>
+<a href="../" id="yzoBack" aria-label="Back to Impl-Ops main page">← Impl-Ops</a>
 <style>
 #yzoBack{position:fixed;left:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:9999;
   display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:999px;
