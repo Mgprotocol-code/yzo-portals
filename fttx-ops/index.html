@@ -346,7 +346,7 @@ function parseSheet(rows){
     ["r","o","c1","bx","pr","cat","tw","e","e2","bk","lb","car","pb","pa","ss","rc","nr","er","be","rcc","ds","ct","tk","rep","k1","src","rs","fa","xa","ua","ls","te","tn","nn","it"].forEach(k=>{const v=clean(g(k));if(v)o[k]=k==="ds"||k==="er"||k==="nr"?v.slice(0,400):v;});
     ["eid","e2id"].forEach(k=>{const v=clean(g(k));if(v)o[k]=v.replace(/\.0$/,"");});
     const ar=toMin(g("ar")),dp=toMin(g("dp")),du=toMin(g("du"));
-    {const t=clean(g("bt"));if(/ca\s*1/i.test(t))o.bt="CA1";else if(/ca\s*2/i.test(t))o.bt="CA2";const tc=dtMin(g("tc")),tr=dtMin(g("tr"));if(tc!=null)o.tc=tc;if(tr!=null)o.tr=tr;}
+    {const t=clean(g("bt"));if(/ca\s*1/i.test(t))o.bt="CA1";else if(/ca\s*2/i.test(t))o.bt="CA2";const [tc,tr]=pickTimes(g("tc"),g("tr"));if(tc!=null)o.tc=tc;if(tr!=null)o.tr=tr;}
     if(ar!=null)o.ar=ar; if(dp!=null)o.dp=dp; if(du)o.du=du;
     const im=parseFloat(g("imp")); if(isFinite(im)&&im>0)o.imp=im;
     if(!o.e&&!o.bx&&!o.cat&&!o.o)continue;
@@ -356,14 +356,33 @@ function parseSheet(rows){
   return out;
 }
 // date-time cell -> minutes since 1970 (clock time as written, no time zone)
-function dtMin(v){
-  if(v==null||v==="")return null;
-  if(typeof v==="number")return v>20000?Math.round((v-25569)*1440):null;
-  if(v instanceof Date&&!isNaN(v))return Math.round(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate(),v.getHours(),v.getMinutes())/60000);
-  const m=String(v).match(/(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/);if(m)return Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])/60000;
-  const n=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);if(n)return Date.UTC(+n[3],+n[2]-1,+n[1],+n[4],+n[5])/60000;
-  return null;
+function dtCands(v){
+  if(v==null||v==="")return[];
+  if(typeof v==="number")return v>20000?[Math.round((v-25569)*1440)]:[];
+  if(v instanceof Date&&!isNaN(v))return[Math.round(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate(),v.getHours(),v.getMinutes())/60000)];
+  const t=String(v).trim();
+  const m=t.match(/(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/);if(m)return[Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])/60000];
+  const n=t.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+  if(n){let h=+n[4];if(n[6]){h=h%12+(/pm/i.test(n[6])?12:0);}
+    const a=+n[1],b=+n[2],y=+n[3],mi=+n[5];
+    const dayFirst=Date.UTC(y,b-1,a,h,mi)/60000,monthFirst=Date.UTC(y,a-1,b,h,mi)/60000;
+    if(a>12||b>31)return[dayFirst];          // 22/10/2026 → day first
+    if(b>12)return[monthFirst];               // 10/22/2026 → month first
+    return a===b?[dayFirst]:[dayFirst,monthFirst]; // 05/10/2026 → could be either
+  }
+  return[];
 }
+function dtMin(v){const c=dtCands(v);return c.length?c[0]:null;}
+// Created and resolved times: when a date could be read two ways (5/10 = 5 Oct or 10 May),
+// pick the reading that gives the shortest service time that is not negative.
+function pickTimes(vc,vr){
+  const C=dtCands(vc),Rr=dtCands(vr);
+  if(!C.length||!Rr.length)return[C.length?C[0]:null,Rr.length?Rr[0]:null];
+  let best=null,bs=Infinity;
+  C.forEach(c=>Rr.forEach(r=>{const d=r-c,sc=d>=0?d:1e12-d;if(sc<bs){bs=sc;best=[c,r];}}));
+  return best;
+}
+
 function portNum(v){if(v==null||v==="")return null;const n=String(v).match(/\d+/g);return n?n.reduce((a,b)=>a+ +b,0):null;}
 const PORT_MAX=500; // a port count above this is treated as a typing error
 
@@ -1640,6 +1659,7 @@ function uploads(P){
   async function save(sb){
     const ok=S.pending.filter(p=>!p.err);
     if(ok.some(p=>!/^\d{4}-\d{2}-\d{2}$/.test(p.date))){msg.textContent="Set a date for every file before saving.";msg.className="msg err";return;}
+    if(S.cloud&&!S.canWrite){msg.textContent="Sign in with the upload password first, then save.";msg.className="msg err";return;}
     if(!S.db){msg.textContent="Saving is not available in this browser.";msg.className="msg err";return;}
     sb.disabled=true;msg.textContent="Saving…";msg.className="msg";
     try{
@@ -1694,7 +1714,7 @@ const mq=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");if
 
 /* ---------- shared storage (Supabase) ---------- */
 const SBC={url:"https://uemxuinndpaazwxayecv.supabase.co",key:"sb_publishable_OLHjd18Q8zjcOgr-wPMjWA_w0f0huZf",
-  uploadEmail:"mgprotocol+fttx@gmail.com",keepDays:45};
+  uploadEmail:"fttxreport@gmail.com",keepDays:45};
 const seedDocs=()=>{try{return JSON.parse(document.getElementById("seed").textContent||"[]");}catch(e){return[];}};
 const toRow=(id,v)=>({id,date:v.date,part:v.part||0,parts:v.parts||1,file:v.file||"",uploaded_at:v.uploadedAt||new Date().toISOString(),rows:v.rows});
 let cloudT=null;
