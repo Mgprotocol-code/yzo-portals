@@ -1686,7 +1686,18 @@ async function writeDay(date,rows,file){
   for(let i=0;i<parts.length;i++)await S.db.doc("days/"+date+"_"+i).set({date,part:i,parts:parts.length,file,uploadedAt:at,rows:parts[i]});
   for(let i=parts.length;i<old;i++)await S.db.doc("days/"+date+"_"+i).delete();
 }
-async function deleteDay(date){const n=(S.days[date]&&S.days[date].parts)||1;for(let i=0;i<n;i++)await S.db.doc("days/"+date+"_"+i).delete();}
+async function deleteDay(date){
+  if(S.cloud){
+    // make sure the sign-in is still valid before deleting
+    const {data:u,error:ue}=await S.cloud.auth.getUser();
+    if(ue||!u||!u.user){S.canWrite=false;render();throw new Error("Your sign-in has expired. Sign in again on the Uploads tab, then delete.");}
+    // delete every part of that day in one go, and check that rows were really removed
+    const {data,error}=await S.cloud.from("fttx_days").delete().eq("date",date).select("id");
+    if(error)throw error;
+    if(!data||!data.length)throw new Error("Nothing was deleted. This account may not have delete permission. Sign out, sign in with the upload password again and retry.");
+    cloudSoon();return;
+  }
+  const n=(S.days[date]&&S.days[date].parts)||1;for(let i=0;i<n;i++)await S.db.doc("days/"+date+"_"+i).delete();}
 function onDocs(snap){
   const by={};
   snap.docs.forEach(d=>{const v=d.data();if(!v||!v.date||!Array.isArray(v.rows))return;(by[v.date]=by[v.date]||{parts:v.parts||1,file:v.file,uploadedAt:v.uploadedAt,chunks:[]}).chunks[v.part||0]=v.rows;});
