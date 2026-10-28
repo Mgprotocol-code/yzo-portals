@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Team Structure & Responsibility Portal (offline copy)</title>
+<title>Team Structure & Responsibility Portal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
@@ -183,6 +185,29 @@ dialog::backdrop{background:rgba(10,20,30,.45)}
 .notice{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:28px;text-align:center;color:var(--muted)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:9px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.on{opacity:1}
+/* ---------- versions ---------- */
+.vnote{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--b2);border-left:5px solid var(--b2);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px}
+.vnote b{color:var(--b2)}
+.vcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:6px 0 8px}
+.vcard h3{margin:0 0 4px;font-size:17px;font-stretch:85%}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:12px 0}
+.vgrid label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
+.vgrid input,.vgrid textarea,.vcard input[type=password]{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:8px 10px;font-size:14px;color:var(--ink)}
+.vgrid .wide{grid-column:1/-1}
+.vrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.vmsg{font-size:13.5px;margin:8px 0 0}
+.vmsg.err{color:var(--gap)} .vmsg.ok{color:var(--ok)}
+.vmsg ul{margin:6px 0 0;padding-left:18px}
+.vchip{font-size:11px;border-radius:10px;padding:1px 8px;margin-left:6px;font-weight:600;white-space:nowrap}
+.vchip.latest{background:var(--ok);color:#fff} .vchip.view{background:var(--b2);color:#fff}
+.vkpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0 16px}
+.vk{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.vk .n{font-size:20px;font-weight:700;font-stretch:85%}
+.vk .l{font-size:12.5px;color:var(--muted)}
+.up{color:var(--ok);font-weight:600} .down{color:var(--gap);font-weight:600}
+.vsec{margin:18px 0 6px;font-size:15px;font-weight:700}
+td.wrap{white-space:normal;min-width:180px}
+.arrow{color:var(--muted);padding:0 4px}
 .ro .edit-only{display:none!important}
 @media (max-width:720px){
   header.top{grid-template-columns:1fr}.status{text-align:left}
@@ -215,12 +240,14 @@ dialog::backdrop{background:rgba(10,20,30,.45)}
     <div class="gs-res" id="gsRes" role="listbox" hidden></div>
   </div>
 
+  <div id="vNote"></div>
   <div class="cap" id="cap"></div>
 
   <nav class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="seniority">Seniority chart</button>
     <button role="tab" aria-selected="false" data-tab="summary">Summary</button>
     <button role="tab" aria-selected="false" data-tab="matrix">Responsibility matrix</button>
+    <button role="tab" aria-selected="false" data-tab="versions">Versions &amp; changes</button>
   </nav>
 
   <section id="tab-seniority">
@@ -255,6 +282,16 @@ dialog::backdrop{background:rgba(10,20,30,.45)}
       <button class="btn" id="exportCsv" hidden>Download CSV</button>
     </div>
     <div class="tbl-wrap"><table id="matrix"></table></div>
+  </section>
+  <section id="tab-versions" hidden>
+    <h2>Versions &amp; changes</h2>
+    <p class="hint">Every uploaded structure is kept as a version. View any version across all tabs, or compare two versions to see what changed.</p>
+    <div id="vUpload"></div>
+    <h2 style="margin-top:26px">Version history</h2>
+    <div class="tbl-wrap"><table id="vTbl"></table></div>
+    <h2 style="margin-top:30px">What changed</h2>
+    <div class="toolbar" id="vCmpBar"></div>
+    <div id="vDiff"></div>
   </section>
 </div>
 
@@ -564,18 +601,209 @@ $("#lockForm").addEventListener("submit",async e=>{e.preventDefault();
   else pwError("Wrong password. Please try again.")});
 $("#pw").addEventListener("input",()=>{$("#pwErr").hidden=true;$("#pw").classList.remove("bad");$("#pw").removeAttribute("aria-invalid")});
 
-/* ---------- boot (offline copy) ---------- */
+/* ---------- boot ---------- */
 const DATA=[{"alloc": 22, "b2": 4, "ground": 11, "main": "FTTx-Operation", "manager": "Nyein Chan Zaw", "office": 2, "order": 1, "ou": "Impl-Ops", "ou1": "FTTHOps2", "owner": "CMA-7", "region": "R2/R2s", "scope": "FTTx-Operation-R2/R2s", "sup": "Thiha-3", "town": "YGN", "_id": "r01"}, {"alloc": 18, "b2": 5, "ground": 9, "main": "FTTx-Operation", "manager": "Nyein Nyein Thu", "office": 3, "order": 2, "ou": "Impl-Ops", "ou1": "FTTHOps1", "owner": "CMA-7", "region": "R1/R1s", "scope": "FTTx-Operation-R1/R1s", "sup": "Aung Pyae Sone", "town": "YGN", "_id": "r02"}, {"alloc": 5, "b2": 0, "ground": 2, "main": "Impl", "manager": "San Min Aung", "office": 0, "order": 3, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "TZ", "region": "R2/R2s", "scope": "CA2-Installation", "sup": "Kaung Khant Kyaw", "town": "YGN", "_id": "r03"}, {"alloc": 19, "b2": 2, "ground": 16, "main": "FTTx-Operation", "manager": "Chan Myae Aung-7", "office": 3, "order": 4, "ou": "Impl-Ops", "ou1": "FTTHOps1", "owner": "CMA-7", "region": "R1/R1s", "scope": "Box-Maint", "sup": "Nyan Lynn Aung", "town": "YGN", "_id": "r04"}, {"alloc": 4, "b2": 1, "ground": 2, "main": "FTTx-Operation", "manager": "Chan Myae Aung-7", "office": 2, "order": 5, "ou": "Impl-Ops", "ou1": "FTTHOps2", "owner": "CMA-7", "region": "YGN", "scope": "Box-Maint(Design and Survey)", "sup": "Sopyay Htet", "town": "YGN", "_id": "r05"}, {"alloc": 3, "b2": 1, "ground": 0, "main": "FTTx-Operation", "manager": "Thura Soe", "office": 3, "order": 6, "ou": "Impl-Ops", "ou1": "FTtxOC", "owner": "SMA", "region": "YGN/R1-O", "scope": "FTTx-Scheduling", "sup": "Kyaw Thura-5", "town": "YGN", "_id": "r06"}, {"alloc": 3, "b2": 1, "ground": 0, "main": "QC", "manager": "Thura Soe", "office": 3, "order": 7, "ou": "Impl-Ops", "ou1": "FTtxOC", "owner": "SMA", "region": "YGN/R1-O", "scope": "Closure-QC", "sup": "Myint Moe", "town": "YGN", "_id": "r07"}, {"alloc": 8, "b2": 1, "ground": 0, "main": "QC", "manager": "N/A", "office": 6, "order": 8, "ou": "Impl-Ops", "ou1": "FTtxOC", "owner": "SMA", "region": "YGN/R1-O", "scope": "Key-QC", "sup": "Nway Zin Hlaing", "town": "YGN", "_id": "r08"}, {"alloc": 3, "b2": 1, "ground": 0, "main": "QC", "manager": "N/A", "office": 3, "order": 9, "ou": "Impl-Ops", "ou1": "FTtxOC", "owner": "SMA", "region": "YGN/R1-O", "scope": "Box-QC", "sup": "Thet Mon Myint", "town": "YGN", "_id": "r09"}, {"alloc": 6, "b2": 1, "ground": 0, "main": "Fleet", "manager": "Kyaw Swar Aung", "office": 6, "order": 10, "ou": "Impl-Ops", "ou1": "Fleet", "owner": "STRM", "region": "All", "scope": "Car Planning and Complaing (office + Contract)", "sup": "Hset Min Thu", "town": "YGN", "_id": "r10"}, {"alloc": 1, "b2": 0, "ground": 0, "main": "Fleet", "manager": "Tun Tun Naing", "office": 1, "order": 11, "ou": "Impl-Ops", "ou1": "Fleet", "owner": "TTN", "region": "YGN", "scope": "Ferry-Support", "sup": "N/A", "town": "YGN", "_id": "r11"}, {"alloc": 3, "b2": 0, "ground": 0, "main": "Fleet", "manager": "Tun Tun Naing", "office": 2, "order": 12, "ou": "Impl-Ops", "ou1": "Fleet", "owner": "TTN", "region": "YGN", "scope": "Reporting & Tracking (Cars,Fuel,Ferry,Maint)", "sup": "Ei Ei Khine", "town": "YGN", "_id": "r12"}, {"alloc": 1, "b2": 1, "ground": 0, "main": "Trainning", "manager": "Kyaw Swar Aung", "office": 1, "order": 13, "ou": "Tech-Ops", "ou1": "BoxOps1", "owner": "STRM", "region": "All", "scope": "Trainning", "sup": "Aung Zaw Zaw Htwe", "town": "YGN", "_id": "r13"}, {"alloc": 8, "b2": 1, "ground": 0, "main": "RMA", "manager": "Myat Thu Maung", "office": 8, "order": 14, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "STRM", "region": "All", "scope": "RMA", "sup": "Nyein Chan Htun", "town": "YGN", "_id": "r14"}, {"alloc": 12, "b2": 1, "ground": 8, "main": "Impl", "manager": "Thant Zin", "office": 1, "order": 15, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "TZ", "region": "All", "scope": "Implementation-Projects", "sup": "Thet Wai Phyo", "town": "YGN", "_id": "r15"}, {"alloc": 4, "b2": 1, "ground": 4, "main": "Impl", "manager": "Thant Zin", "office": 0, "order": 16, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "TZ", "region": "All", "scope": "Pole-Erecting", "sup": "Zwe Nay Paing", "town": "YGN", "_id": "r16"}, {"alloc": 4, "b2": 0, "ground": 3, "main": "Impl", "manager": "Thant Zin", "office": 1, "order": 17, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "TZ", "region": "All", "scope": "Site Leasing", "sup": "N/A", "town": "YGN", "_id": "r17"}, {"alloc": 2, "b2": 0, "ground": 0, "main": "Support", "manager": "Thant Zin", "office": 2, "order": 18, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "TZ", "region": "All", "scope": "Office Support(All)", "sup": "N/A", "town": "YGN", "_id": "r18"}, {"alloc": 12, "b2": 1, "ground": 7, "main": "Impl", "manager": "San Min Aung", "office": 2, "order": 19, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "TZ", "region": "All", "scope": "Improvement-Porjects", "sup": "Kaung Khant Kyaw", "town": "YGN", "_id": "r19"}, {"alloc": 4, "b2": 1, "ground": 3, "main": "FTTx-Operation", "manager": "Soe Min Htun", "office": 0, "order": 20, "ou": "Impl-Ops", "ou1": "FiberOps1", "owner": "YZO", "region": "MAM", "scope": "FTTx-Operation-MAM", "sup": "Aung Pyae Phyo-6", "town": "MAM", "_id": "r20"}, {"alloc": 7, "b2": 1, "ground": 4, "main": "LAN-Operation", "manager": "Soe Min Htun", "office": 0, "order": 21, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "YZO", "region": "MAM", "scope": "LAN-Operation(MAM)", "sup": "Paing Toe", "town": "MAM", "_id": "r21"}, {"alloc": 1, "b2": 1, "ground": 0, "main": "FTTx-Operation", "manager": "Kaung Myat Thu-5", "office": 1, "order": 22, "ou": "Impl-Ops", "ou1": "FiberOps1", "owner": "YZO", "region": "R1-O", "scope": "Office Support(R1-Other cities)", "sup": "Thandar Phyo", "town": "TOB", "_id": "r22"}, {"alloc": 7, "b2": 3, "ground": 4, "main": "FTTx-Operation", "manager": "Kaung Myat Thu-5", "office": 1, "order": 23, "ou": "Impl-Ops", "ou1": "FiberOps1", "owner": "YZO", "region": "BOB", "scope": "FTTx-Operation-BOB", "sup": "Lwin Phyo Hein", "town": "BOB", "_id": "r23"}, {"alloc": 3, "b2": 2, "ground": 2, "main": "FTTx-Operation", "manager": "Kaung Myat Thu-5", "office": 0, "order": 24, "ou": "Impl-Ops", "ou1": "FiberOps1", "owner": "YZO", "region": "TOB", "scope": "FTTx-Operation-TOB", "sup": "Naing Lin Aung-2", "town": "TOB", "_id": "r24"}, {"alloc": 3, "b2": 1, "ground": 3, "main": "FTTx-Operation", "manager": "Kaung Myat Thu-5", "office": 0, "order": 25, "ou": "Impl-Ops", "ou1": "FiberOps1", "owner": "YZO", "region": "MYW", "scope": "FTTx-Operation-MYW", "sup": "Aung Soe Min", "town": "MYW", "_id": "r25"}, {"alloc": 21, "b2": 4, "ground": 17, "main": "LAN-Operation", "manager": "Ei Mon Khine San", "office": 2, "order": 26, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "YZO", "region": "BOB", "scope": "LAN-Operation(BOB)", "sup": "Hein Soe Win", "town": "BOB", "_id": "r26"}, {"alloc": 8, "b2": 2, "ground": 7, "main": "LAN-Operation", "manager": "Ei Mon Khine San", "office": 1, "order": 27, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "YZO", "region": "TOB", "scope": "LAN-Operation(TOB)", "sup": "Thandar Moe", "town": "TOB", "_id": "r27"}, {"alloc": 5, "b2": 1, "ground": 5, "main": "LAN-Operation", "manager": "Ei Mon Khine San", "office": 0, "order": 28, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "YZO", "region": "MYW", "scope": "LAN-Operation(MYW)", "sup": "Paing Nyein Oo", "town": "MYW", "_id": "r28"}, {"alloc": 10, "b2": 2, "ground": 8, "main": "LAN-Operation", "manager": "N/A", "office": 1, "order": 29, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "STKZ", "region": "R1s", "scope": "LAN-Operation(SAY)", "sup": "Hteet Lwin Aung", "town": "YGN", "_id": "r29"}, {"alloc": 3, "b2": 1, "ground": 3, "main": "LAN-Operation", "manager": "N/A", "office": 0, "order": 30, "ou": "Tech-Ops", "ou1": "BoxOps1", "owner": "STKZ", "region": "YGN", "scope": "Fix-Wireless", "sup": "N/A", "town": "YGN", "_id": "r30"}, {"alloc": 15, "b2": 1, "ground": 13, "main": "LAN-Operation", "manager": "SoeThura Htet", "office": 0, "order": 31, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "YZO", "region": "R1", "scope": "LAN-Operation(NAY)", "sup": "Aung Zaw Zaw Htwe", "town": "YGN", "_id": "r31"}, {"alloc": 10, "b2": 2, "ground": 7, "main": "LAN-Operation", "manager": "Ye Kyaw", "office": 1, "order": 32, "ou": "Tech-Ops", "ou1": "BoxOps1", "owner": "STKZ", "region": "R1", "scope": "LAN-Operation(TNY)", "sup": "Su Zin Win", "town": "YGN", "_id": "r32"}, {"alloc": 6, "b2": 3, "ground": 0, "main": "LAN-Operation", "manager": "Min Khnat Thu", "office": 5, "order": 33, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "TTN", "region": "YGN", "scope": "Reporting & Tracking(R1,R1s)", "sup": "N/A", "town": "YGN", "_id": "r33"}, {"alloc": 14, "b2": 2, "ground": 10, "main": "LAN-Operation", "manager": "Tun Tun Naing", "office": 1, "order": 34, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "TTN", "region": "R1", "scope": "LAN-Operation(TAY)", "sup": "Min Thu Rein", "town": "YGN", "_id": "r34"}, {"alloc": 2, "b2": 0, "ground": 0, "main": "Impl", "manager": "Kyaw Kyaw", "office": 0, "order": 35, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "TZ", "region": "All", "scope": "Migration-Projects", "sup": "N/A", "town": "All", "_id": "r35"}, {"alloc": 0, "b2": 0, "ground": 0, "main": "Impl", "manager": "Kyaw Kyaw", "office": 0, "order": 36, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "TZ", "region": "All", "scope": "Ground Manager", "sup": "N/A", "town": "All", "_id": "r36"}, {"alloc": 2, "b2": 0, "ground": 0, "main": "Support", "manager": "Nyein Nyein Thu", "office": 2, "order": 37, "ou": "Impl-Ops", "ou1": "FTTHOps1", "owner": "SMA", "region": "YGN", "scope": "Office Support(All)", "sup": "N/A", "town": "YGN", "_id": "r37"}, {"alloc": 0, "b2": 0, "ground": 0, "main": "QC", "manager": "Myat Thu Maung", "office": 0, "order": 38, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "STRM", "region": "All", "scope": "Go-No-Go-QC", "sup": "N/A", "town": "All", "_id": "r38"}, {"alloc": 2, "b2": 0, "ground": 0, "main": "Fleet", "manager": "Kyaw Swar Aung", "office": 1, "order": 39, "ou": "Impl-Ops", "ou1": "Fleet", "owner": "STRM", "region": "All", "scope": "Maintenance / Accident", "sup": "N/A", "town": "YGN", "_id": "r39"}, {"alloc": 1, "b2": 0, "ground": 0, "main": "Fleet", "manager": "Tun Tun Naing", "office": 1, "order": 40, "ou": "Impl-Ops", "ou1": "Fleet", "owner": "TTN", "region": "All", "scope": "Fuel-Control and related", "sup": "N/A", "town": "YGN", "_id": "r40"}, {"alloc": 1, "b2": 0, "ground": 0, "main": "Fleet", "manager": "Tun Tun Naing", "office": 0, "order": 41, "ou": "Tech-Ops", "ou1": "BoxOps1", "owner": "TTN", "region": "R1", "scope": "R1's car planning and complaining", "sup": "Min Thu Rein", "town": "YGN", "_id": "r41"}, {"alloc": 16, "b2": 2, "ground": 9, "main": "LAN-Operation", "manager": "N/A", "office": 1, "order": 42, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "STKZ", "region": "R1s", "scope": "LAN-Operation(MTY & TEY)", "sup": "Htay Win Kyaw", "town": "YGN", "_id": "r42"}, {"alloc": 2, "b2": 1, "ground": 0, "main": "Design", "manager": "Phoo Myat Thwe", "office": 1, "order": 43, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "SMA", "region": "All", "scope": "Core Planning(impl + ops)", "sup": "Aye Thandar Htun", "town": "YGN", "_id": "r43"}, {"alloc": 2, "b2": 1, "ground": 0, "main": "Design", "manager": "N/A", "office": 1, "order": 44, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "SMA", "region": "All", "scope": "Pole,MIH & Househole related (all)", "sup": "EiEiKhine", "town": "YGN", "_id": "r44"}, {"alloc": 1, "b2": 0, "ground": 0, "main": "Design", "manager": "Wai Yan Htet Aung", "office": 1, "order": 45, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "YZO", "region": "All", "scope": "POI/PortFull , Active/Passive Poles Daily Operation", "sup": "N/A", "town": "YGN", "_id": "r45"}, {"alloc": 1, "b2": 0, "ground": 1, "main": "Design", "manager": "Phyo Thet Khine", "office": 0, "order": 46, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "YZO", "region": "All", "scope": "Fttx-Design & Operation Design", "sup": "N/A", "town": "YGN", "_id": "r46"}, {"alloc": 0, "b2": 0, "ground": 0, "main": "Design", "manager": "Phyo Thet Khine", "office": 0, "order": 47, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "YZO", "region": "All", "scope": "Code Center", "sup": "N/A", "town": "YGN", "_id": "r47"}, {"alloc": 0, "b2": 0, "ground": 0, "main": "Impl", "manager": "N/A", "office": 0, "order": 48, "ou": "Impl-Ops", "ou1": "FiberW", "owner": "SMA", "region": "All", "scope": "Project , inventory and resource Planning", "sup": "N/A", "town": "YGN", "_id": "r48"}, {"alloc": 11, "b2": 0, "ground": 9, "main": "LAN-Operation", "manager": "Min Khnat Thu", "office": 0, "order": 49, "ou": "Tech-Ops", "ou1": "BackEndOps1", "owner": "TTN", "region": "R1s", "scope": "LAN-Operation(DOY)", "sup": "N/A", "town": "YGN", "_id": "r49"}], META={"headCode": "YZO", "headName": "Ye Zaw Oo", "reportsTo": "Phyo Kyi Thein", "ownerNames": {"YZO": "Ye Zaw Oo"}, "updatedAt": "2026-09-29T09:00:00Z"};
+
+/* ---------- versions (Supabase) ---------- */
+const SB_URL="https://uemxuinndpaazwxayecv.supabase.co",SB_KEY="sb_publishable_OLHjd18Q8zjcOgr-wPMjWA_w0f0huZf",OWNER_EMAIL="mgprotocol@gmail.com";
+const BASE={id:"base",version:"1",effective_date:"2026-09-29",notes:"Original structure (offline copy exported 29 Sep 2026).",uploaded_by:"",uploaded_at:"2026-09-29T09:00:00Z",file_name:"",row_count:DATA.length,local:true};
+const VS={sb:null,signed:false,list:[],cache:{},cur:null,baseOnly:false,cmpA:null,cmpB:null,pending:null};
+const LABEL={main:"Main function",owner:"Owner",manager:"Manager",sup:"Supervisor (Band-2)",ou:"OU",ou1:"OU-1",region:"Region",town:"Home township",scope:"Job scope / department",b2:"Band-2 HCs",office:"Office HCs",ground:"Ground HCs",alloc:"Total allocated HCs"};
+const NUMF=["b2","office","ground","alloc"],CMPF=["main","manager","sup","ou","ou1","region","town","b2","office","ground","alloc"];
+const nrm=s=>String(s??"").toLowerCase().replace(/[^a-z0-9]/g,"");
+const keyOf=r=>nrm(r.scope)+"|"+nrm(r.owner);
+const fmtD=d=>{if(!d)return"—";const x=new Date(String(d).length<=10?d+"T00:00:00":d);return isNaN(x)?String(d):x.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})};
+const fmtDT=d=>{const x=new Date(d);return isNaN(x)?"—":x.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})+", "+x.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"})};
+const vById=id=>VS.list.find(v=>String(v.id)===String(id));
+const vLabel=v=>v?"Version "+v.version:"—";
+const isOwner=s=>!!(s&&s.user&&s.user.email===OWNER_EMAIL);
+
+async function vLoadList(){
+  const {data,error}=await VS.sb.from("team_versions").select("id,version,effective_date,notes,uploaded_by,uploaded_at,file_name,row_count").order("uploaded_at",{ascending:false});
+  if(error){toast("Couldn't load versions. Showing the saved copy.");VS.list=[];return;}
+  VS.list=data||[];
+}
+async function vGet(id){
+  if(VS.cache[id])return VS.cache[id];
+  if(id==="base")return VS.cache.base={rows:DATA,meta:META};
+  const {data,error}=await VS.sb.from("team_versions").select("rows,meta").eq("id",id).single();
+  if(error)throw error;
+  return VS.cache[id]={rows:data.rows||[],meta:data.meta||META};
+}
+async function vShow(id){
+  const v=vById(id);if(!v)return;
+  let d;try{d=await vGet(id);}catch(e){toast("Couldn't open that version.");return;}
+  VS.cur=String(id);rows=d.rows;meta=Object.assign({},META,d.meta||{},{updatedAt:v.uploaded_at});
+  selOwner=null;findName="";findRid="";mFilter=null;
+  renderAll();vBanner();
+}
+function vBanner(){
+  const v=vById(VS.cur),latest=VS.list[0],old=v&&latest&&String(v.id)!==String(latest.id);
+  $("#status").innerHTML+=`<br>${esc(vLabel(v))}${v&&v.effective_date?" · effective "+esc(fmtD(v.effective_date)):""}${old?" · older version":""}`;
+  $("#vNote").innerHTML=old?`<div class="vnote">You are viewing <b>${esc(vLabel(v))}</b> (effective ${esc(fmtD(v.effective_date))}), not the latest. <button class="btn" type="button" id="vLatest">Show latest (${esc(vLabel(latest))})</button></div>`:"";
+  if(old)$("#vLatest").onclick=async()=>{await vShow(latest.id);vRender();};
+}
+
+/* parse an uploaded Excel / CSV file */
+const HMAP={main:"main",mainfunction:"main",owner:"owner",manager:"manager",supervisorband2:"sup",supervisor:"sup",ou:"ou",ou1:"ou1",region:"region",hometownship:"town",township:"town",jobscopedepartment:"scope",jobscope:"scope",department:"scope",band2hcs:"b2",band2:"b2",officehcs:"office",groundhcs:"ground",totalallocatehcs:"alloc",totalallocatedhcs:"alloc",allocatedhcs:"alloc"};
+function vParse(buf){
+  let A;
+  try{const wb=XLSX.read(buf,{type:"array"});A=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true});}
+  catch(e){return{errors:["This file can't be read. Save it as Excel (.xlsx) or CSV and try again."]};}
+  let hi=-1,idx={};
+  for(let i=0;i<Math.min(A.length,15);i++){const m={};(A[i]||[]).forEach((c,j)=>{const f=HMAP[nrm(c)];if(f&&!(f in m))m[f]=j;});if("scope" in m&&"owner" in m){hi=i;idx=m;break;}}
+  if(hi<0)return{errors:["The header row wasn't found. Use the template: the first sheet needs columns such as Owner and Job-Scope / Department."]};
+  const need=Object.keys(LABEL),missing=need.filter(k=>!(k in idx)),errors=[],out=[];
+  if(missing.length)errors.push("Missing columns: "+missing.map(k=>LABEL[k]).join(", ")+".");
+  for(let i=hi+1;i<A.length;i++){
+    const R=A[i];if(!R||R.every(v=>String(v).trim()===""))continue;
+    const o={};need.forEach(k=>{if(k in idx){const v=R[idx[k]];o[k]=typeof v==="string"?v.trim():v;}});
+    if(!o.scope&&!o.owner)continue;
+    const line=i+1;
+    if(!o.scope)errors.push(`Row ${line}: Job scope is empty.`);
+    if(!o.owner)errors.push(`Row ${line}: Owner is empty.`);
+    NUMF.forEach(k=>{const v=o[k];if(v===""||v==null){o[k]=0;return;}const n=Number(String(v).replace(/,/g,""));if(!isFinite(n))errors.push(`Row ${line}: ${LABEL[k]} “${v}” is not a number.`);else o[k]=n;});
+    need.filter(k=>!NUMF.includes(k)).forEach(k=>{o[k]=o[k]==null?"":String(o[k]).trim();});
+    o.order=out.length+1;o._id="r"+String(out.length+1).padStart(2,"0");out.push(o);
+  }
+  if(!out.length&&!errors.length)errors.push("No data rows were found under the header row.");
+  const seen=new Set();out.forEach(r=>{const k=keyOf(r);if(seen.has(k))errors.push(`“${r.scope}” appears twice for owner ${r.owner}. Each owner can have a job scope only once.`);seen.add(k);});
+  return{rows:out,errors};
+}
+
+/* compare two versions */
+function vDiff(A,B){
+  const ma=new Map(A.map(r=>[keyOf(r),r])),mb=new Map(B.map(r=>[keyOf(r),r]));
+  const added=B.filter(r=>!ma.has(keyOf(r))),removed=A.filter(r=>!mb.has(keyOf(r))),changed=[];
+  B.forEach(r=>{const o=ma.get(keyOf(r));if(!o)return;const ch=CMPF.filter(k=>NUMF.includes(k)?num(o[k])!==num(r[k]):String(o[k]??"").trim()!==String(r[k]??"").trim()).map(k=>({k,from:o[k],to:r[k]}));if(ch.length)changed.push({r,ch});});
+  return{added,removed,changed,ta:sum(A),tb:sum(B),na:A.length,nb:B.length};
+}
+function dTxt(a,b,goodUp){const d=b-a;if(!d)return"";const good=goodUp==null?null:(d>0)===goodUp;return ` <span class="${good==null?"":good?"up":"down"}">(${d>0?"+":""}${d})</span>`;}
+function diffHTML(D){
+  const k=(n,l,a,b,g)=>`<div class="vk"><div class="n">${a} <span class="arrow">→</span> ${b}${dTxt(a,b,g)}</div><div class="l">${l}</div></div>`;
+  let h=`<div class="vkpis">${k(0,"Job scopes",D.na,D.nb,null)}${k(0,"Allocated HCs",D.ta.alloc,D.tb.alloc,null)}${k(0,"Current HCs (office + ground)",D.ta.cur,D.tb.cur,true)}${k(0,"Still required",D.ta.req,D.tb.req,false)}${k(0,"Band-2 HCs",D.ta.b2,D.tb.b2,null)}</div>`;
+  if(!D.added.length&&!D.removed.length&&!D.changed.length)return h+`<div class="notice">No differences between these two versions.</div>`;
+  const rowT=list=>`<div class="tbl-wrap"><table><thead><tr><th>Owner</th><th>Job scope / department</th><th>Manager</th><th>Supervisor</th><th>Region</th><th style="text-align:right">Current / allocated</th></tr></thead><tbody>${list.map(r=>{const c=calc(r);return`<tr><td>${esc(r.owner)}</td><td class="wrap"><b>${esc(r.scope)}</b></td><td>${esc(r.manager)}</td><td>${esc(r.sup)}</td><td>${esc(r.region)}</td><td style="text-align:right">${c.cur} / ${c.alloc}</td></tr>`}).join("")}</tbody></table></div>`;
+  if(D.added.length)h+=`<div class="vsec up">Added job scopes (${D.added.length})</div>`+rowT(D.added);
+  if(D.removed.length)h+=`<div class="vsec down">Removed job scopes (${D.removed.length})</div>`+rowT(D.removed);
+  if(D.changed.length){
+    h+=`<div class="vsec">Changed job scopes (${D.changed.length})</div><div class="tbl-wrap"><table><thead><tr><th>Owner</th><th>Job scope / department</th><th>What changed</th><th>Before</th><th></th><th>After</th></tr></thead><tbody>`;
+    D.changed.forEach(({r,ch})=>ch.forEach((c,i)=>{const isN=NUMF.includes(c.k);h+=`<tr>${i===0?`<td rowspan="${ch.length}">${esc(r.owner)}</td><td rowspan="${ch.length}" class="wrap"><b>${esc(r.scope)}</b></td>`:""}<td>${esc(LABEL[c.k])}</td><td>${esc(c.from===""||c.from==null?"(blank)":c.from)}</td><td class="arrow">→</td><td><b>${esc(c.to===""||c.to==null?"(blank)":c.to)}</b>${isN?dTxt(num(c.from),num(c.to),null):""}</td></tr>`;}));
+    h+=`</tbody></table></div>`;
+  }
+  return h;
+}
+
+/* versions tab */
+function vRender(){vRenderUpload();vRenderTable();vRenderCompare();}
+function vRenderTable(){
+  const latest=VS.list[0];
+  $("#vTbl").innerHTML=`<thead><tr><th>Version</th><th>Effective date</th><th>Uploaded</th><th>By</th><th>Notes</th><th style="text-align:right">Job scopes</th><th>File</th><th></th></tr></thead><tbody>${VS.list.map((v,i)=>`<tr>
+    <td><b>${esc(vLabel(v))}</b>${latest&&v.id===latest.id?'<span class="vchip latest">latest</span>':""}${String(v.id)===VS.cur?'<span class="vchip view">viewing</span>':""}</td>
+    <td>${esc(fmtD(v.effective_date))}</td><td>${esc(fmtDT(v.uploaded_at))}</td><td>${esc(v.uploaded_by||"—")}</td>
+    <td class="wrap">${esc(v.notes||"")}</td><td style="text-align:right">${v.row_count??"—"}</td>
+    <td>${v.file_name?`<button class="btn" type="button" data-file="${esc(v.id)}">Download</button>`:"—"}</td>
+    <td><span class="vrow">${String(v.id)===VS.cur?"":`<button class="btn" type="button" data-view="${esc(v.id)}">View</button>`}${VS.list[i+1]?`<button class="btn" type="button" data-cmp="${esc(v.id)}">Changes</button>`:""}${VS.signed&&!v.local&&VS.list.length>1?`<button class="btn danger" type="button" data-del="${esc(v.id)}">Delete</button>`:""}</span></td></tr>`).join("")}</tbody>`;
+}
+$("#vTbl").addEventListener("click",async e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.view){await vShow(b.dataset.view);vRender();showTab("seniority");window.scrollTo({top:0,behavior:"smooth"});}
+  else if(b.dataset.cmp){const i=VS.list.findIndex(v=>String(v.id)===b.dataset.cmp);VS.cmpB=String(VS.list[i].id);VS.cmpA=String(VS.list[i+1].id);vRenderCompare();$("#vCmpBar").scrollIntoView({behavior:"smooth",block:"start"});}
+  else if(b.dataset.file)vDownload(b.dataset.file);
+  else if(b.dataset.del){const v=vById(b.dataset.del);if(!confirm(`Delete ${vLabel(v)}? This can't be undone.`))return;
+    const {error}=await VS.sb.from("team_versions").delete().eq("id",v.id);if(error){toast("Couldn't delete: "+error.message);return;}
+    delete VS.cache[v.id];await vLoadList();if(!VS.list.length){VS.list=[BASE];VS.baseOnly=true;}
+    if(!vById(VS.cur))await vShow(VS.list[0].id);VS.cmpA=VS.cmpB=null;vRender();toast("Version deleted");}
+});
+async function vDownload(id){
+  const {data,error}=await VS.sb.from("team_versions").select("file_name,file_b64").eq("id",id).single();
+  if(error||!data||!data.file_b64){toast("The original file isn't available.");return;}
+  const bin=atob(data.file_b64),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  const u=URL.createObjectURL(new Blob([u8])),l=document.createElement("a");l.href=u;l.download=data.file_name||"team-structure";document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);
+}
+async function vRenderCompare(){
+  const L=VS.list;
+  if(L.length<2){$("#vCmpBar").innerHTML="";$("#vDiff").innerHTML=`<div class="notice">Upload a new version to see what changed. Only one version exists so far.</div>`;return;}
+  if(!VS.cmpB||!vById(VS.cmpB))VS.cmpB=String(L[0].id);
+  if(!VS.cmpA||!vById(VS.cmpA)){const i=L.findIndex(v=>String(v.id)===VS.cmpB);VS.cmpA=String((L[i+1]||L[1]).id);}
+  const opt=sel=>L.map(v=>`<option value="${esc(v.id)}"${String(v.id)===sel?" selected":""}>${esc(vLabel(v))} · ${esc(fmtD(v.effective_date))}</option>`).join("");
+  $("#vCmpBar").innerHTML=`<label class="hint" style="margin:0">Compare</label><select class="f" id="vA">${opt(VS.cmpA)}</select><span class="arrow">→</span><select class="f" id="vB">${opt(VS.cmpB)}</select>`;
+  $("#vA").onchange=e=>{VS.cmpA=e.target.value;vRenderCompare();};
+  $("#vB").onchange=e=>{VS.cmpB=e.target.value;vRenderCompare();};
+  $("#vDiff").innerHTML=`<p class="hint">Working out the changes…</p>`;
+  try{const [a,b]=await Promise.all([vGet(VS.cmpA),vGet(VS.cmpB)]);
+    $("#vDiff").innerHTML=`<p class="hint">From <b>${esc(vLabel(vById(VS.cmpA)))}</b> to <b>${esc(vLabel(vById(VS.cmpB)))}</b>. Job scopes are matched by owner and job scope name, so a renamed job scope shows as removed and added.</p>`+diffHTML(vDiff(a.rows,b.rows));}
+  catch(e){$("#vDiff").innerHTML=`<div class="notice">Couldn't load these versions. Reload and try again.</div>`;}
+}
+function nextVersion(){const n=VS.list.map(v=>parseFloat(v.version)).filter(isFinite);return String(n.length?Math.floor(Math.max(...n))+1:2);}
+function vRenderUpload(){
+  const box=$("#vUpload");
+  if(!VS.sb){box.innerHTML=`<div class="vcard"><h3>Upload a new version</h3><p class="hint" style="margin:0">Uploading needs the online database, which couldn't be reached. Check the internet connection and reload.</p></div>`;return;}
+  if(!VS.signed){
+    box.innerHTML=`<div class="vcard"><h3>Upload a new version</h3><p class="hint">Only the portal owner can upload. Enter the owner password (the same one used to edit the Impl-Ops main page).</p>
+      <div class="vrow"><input type="password" id="vPw" placeholder="Owner password" aria-label="Owner password" autocomplete="current-password"><button class="btn primary" type="button" id="vSign">Sign in</button><span class="vmsg" id="vSignMsg" role="status"></span></div></div>`;
+    const go=async()=>{const pw=$("#vPw").value;if(!pw)return;$("#vSignMsg").textContent="Checking…";$("#vSignMsg").className="vmsg";
+      const {data,error}=await VS.sb.auth.signInWithPassword({email:OWNER_EMAIL,password:pw});
+      if(error||!isOwner(data.session)){$("#vSignMsg").textContent="Wrong password. Try again.";$("#vSignMsg").className="vmsg err";return;}
+      VS.signed=true;vRender();toast("Signed in");};
+    $("#vSign").onclick=go;$("#vPw").onkeydown=e=>{if(e.key==="Enter")go();};return;
+  }
+  const today=new Date().toISOString().slice(0,10);
+  box.innerHTML=`<div class="vcard"><h3>Upload a new version</h3>
+    <p class="hint" style="margin:0">Use the template so the columns match: <button class="btn" type="button" id="vTpl">Download template (latest version as CSV)</button> Edit it in Excel, save as .xlsx or .csv, then upload it here.</p>
+    <div class="vgrid">
+      <label class="wide">File (Excel or CSV, up to 5 MB)<input type="file" id="vFile" accept=".xlsx,.xls,.csv"></label>
+      <label>Version<input type="text" id="vVer" value="${esc(nextVersion())}" maxlength="20"></label>
+      <label>Effective date<input type="date" id="vEff" value="${today}"></label>
+      <label>Uploaded by<input type="text" id="vBy" maxlength="60" placeholder="Your name"></label>
+      <label class="wide">What changed and why (notes)<textarea id="vNotes" rows="2" maxlength="500" placeholder="e.g. New R3 team under CMA-7; Thiha-3 moved to R2s"></textarea></label>
+    </div>
+    <div id="vPrev"></div>
+    <div class="vrow" style="margin-top:10px"><button class="btn primary" type="button" id="vSave" disabled>Save as new version</button><button class="btn" type="button" id="vOut">Sign out</button><span class="vmsg" id="vSaveMsg" role="status"></span></div></div>`;
+  $("#vTpl").onclick=async()=>{if(VS.list[0]&&String(VS.list[0].id)!==VS.cur){await vShow(VS.list[0].id);vRenderTable();}$("#exportCsv").click();};
+  $("#vOut").onclick=async()=>{await VS.sb.auth.signOut();VS.signed=false;VS.pending=null;vRender();};
+  $("#vFile").onchange=async e=>{
+    const f=e.target.files[0];VS.pending=null;$("#vSave").disabled=true;$("#vPrev").innerHTML="";if(!f)return;
+    if(f.size>5*1024*1024){$("#vPrev").innerHTML=`<p class="vmsg err">This file is larger than 5 MB.</p>`;return;}
+    const buf=await f.arrayBuffer(),P=vParse(buf);
+    if(P.errors.length){$("#vPrev").innerHTML=`<div class="vmsg err"><b>Please fix these and upload again:</b><ul>${P.errors.slice(0,12).map(x=>`<li>${esc(x)}</li>`).join("")}${P.errors.length>12?`<li>…and ${P.errors.length-12} more</li>`:""}</ul></div>`;return;}
+    let latestRows=[];try{latestRows=(await vGet(VS.list[0].id)).rows;}catch(err){}
+    const D=vDiff(latestRows,P.rows),t=sum(P.rows);
+    let b64="";{const u8=new Uint8Array(buf);let s="";for(let i=0;i<u8.length;i+=8192)s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));b64=btoa(s);}
+    VS.pending={rows:P.rows,file_name:f.name,file_b64:b64};
+    $("#vPrev").innerHTML=`<p class="vmsg ok"><b>${P.rows.length} job scopes</b> read · ${t.cur} current / ${t.alloc} allocated HCs. Compared with ${esc(vLabel(VS.list[0]))}: <b>${D.added.length}</b> added, <b>${D.removed.length}</b> removed, <b>${D.changed.length}</b> changed.</p>`+(D.added.length||D.removed.length||D.changed.length?`<details><summary class="hint" style="cursor:pointer;margin:6px 0">Show the changes</summary>${diffHTML(D)}</details>`:`<p class="vmsg">No differences from the latest version.</p>`);
+    $("#vSave").disabled=false;
+  };
+  $("#vSave").onclick=async()=>{
+    const P=VS.pending,msg=$("#vSaveMsg");if(!P)return;
+    const ver=$("#vVer").value.trim();if(!ver){msg.textContent="Enter a version.";msg.className="vmsg err";return;}
+    if(VS.list.some(v=>!v.local&&v.version===ver)){msg.textContent=`Version ${ver} already exists. Use a different number.`;msg.className="vmsg err";return;}
+    $("#vSave").disabled=true;msg.className="vmsg";msg.textContent="Saving…";
+    try{
+      if(VS.baseOnly){const {error}=await VS.sb.from("team_versions").insert({version:BASE.version,effective_date:BASE.effective_date,notes:BASE.notes,uploaded_by:"",uploaded_at:BASE.uploaded_at,file_name:"",row_count:DATA.length,rows:DATA,meta:META});if(error)throw error;VS.baseOnly=false;}
+      const {data,error}=await VS.sb.from("team_versions").insert({version:ver,effective_date:$("#vEff").value||null,notes:$("#vNotes").value.trim(),uploaded_by:$("#vBy").value.trim(),file_name:P.file_name,file_b64:P.file_b64,row_count:P.rows.length,rows:P.rows,meta:Object.assign({},META,meta,{updatedAt:undefined})}).select("id").single();
+      if(error)throw error;
+      VS.pending=null;await vLoadList();await vShow(data.id);VS.cmpA=VS.cmpB=null;vRender();toast(`Version ${ver} saved`);
+    }catch(err){msg.textContent="Couldn't save: "+(err.message||err);msg.className="vmsg err";$("#vSave").disabled=false;}
+  };
+}
+
 let booted=false;
-function boot(){if(booted)return;booted=true;
+async function boot(){if(booted)return;booted=true;
   rows=DATA;meta=META;canWrite=false;document.body.classList.add("ro");
-  $("#exportCsv").hidden=false;renderAll();
-  $("#status").innerHTML+=`<br>Offline copy · exported ${new Date("2026-09-29").toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})}`;
+  $("#exportCsv").hidden=false;
+  if(window.supabase&&window.supabase.createClient){
+    try{VS.sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{storageKey:"team-structure-auth"}});
+      try{const {data}=await VS.sb.auth.getSession();VS.signed=isOwner(data&&data.session);}catch(e){}
+      await vLoadList();}catch(e){VS.sb=null;}
+  }
+  if(!VS.list.length){VS.list=[BASE];VS.baseOnly=true;}
+  await vShow(VS.list[0].id);vRender();
 }
 })();
 </script>
-<!-- Back to YZO Portals -->
-<a href="https://yzo-portals.netlify.app/" id="yzoBack" aria-label="Back to YZO Portals main page">← YZO Portals</a>
+<!-- Back to Impl-Ops -->
+<a href="https://yzo-portals.netlify.app/" id="yzoBack" aria-label="Back to Impl-Ops main page">← Impl-Ops</a>
 <style>
 #yzoBack{position:fixed;left:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:9999;
   display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:999px;
