@@ -1,0 +1,1280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Box-Ops daily report v9</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#EAEFF2;--surface:#FFFFFF;--ink:#16304A;--muted:#5B6D7D;--line:#D2DAE0;--fiber:#0D7C87;--fiber-soft:#D6EEF0;--amber:#B86E00;--amber-soft:#FBEBD2;--fault:#B3392D;--fault-soft:#F8DEDA;--ok:#2E7D4F;--ok-soft:#DCEFE3;--rail:#16304A;--rail-ink:#DCE7EF;
+--sans:'Barlow',system-ui,'Segoe UI','Myanmar Text','Padauk',sans-serif;--cond:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0F1A24;--surface:#16232F;--ink:#E3ECF2;--muted:#93A6B6;--line:#2A3A48;--fiber:#3FB6C1;--fiber-soft:#133A40;--amber:#E6A23C;--amber-soft:#3A2C14;--fault:#E3746A;--fault-soft:#3D1F1C;--ok:#5CC08A;--ok-soft:#183626;--rail:#0B141C;--rail-ink:#C9D6E0;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0F1A24;--surface:#16232F;--ink:#E3ECF2;--muted:#93A6B6;--line:#2A3A48;--fiber:#3FB6C1;--fiber-soft:#133A40;--amber:#E6A23C;--amber-soft:#3A2C14;--fault:#E3746A;--fault-soft:#3D1F1C;--ok:#5CC08A;--ok-soft:#183626;--rail:#0B141C;--rail-ink:#C9D6E0;color-scheme:dark}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans)}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fiber);outline-offset:2px}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+nav.rail{background:var(--rail);color:var(--rail-ink);padding:22px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{font:700 26px/1 var(--cond);letter-spacing:.01em;margin:0 8px 4px;color:#fff}
+.brand small{display:block;font:500 13px/1.4 var(--sans);color:var(--rail-ink);opacity:.75;margin-top:6px}
+.rail ul{list-style:none;margin:22px 0 0;padding:0}
+.rail button{width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:6px;cursor:pointer;color:var(--rail-ink);display:flex;justify-content:space-between;gap:8px}
+.rail button:hover{background:rgba(255,255,255,.07)}
+.rail button[aria-current="true"]{background:var(--fiber);color:#fff;font-weight:600}
+.rail .days{margin:26px 8px 0;font-size:13px;opacity:.85}
+.loaderr{margin-top:10px;padding:8px;border-radius:6px;background:var(--fault);color:#fff;opacity:1}
+main{padding:22px 28px 110px;min-width:0}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:18px}
+.bar h1{font:700 34px/1.05 var(--cond);margin:0 auto 0 0}
+.bar label{font-size:12.5px;color:var(--muted);display:grid;gap:3px}
+.bar .ms{flex:0 1 auto}.bar select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-width:170px}
+.ms{position:relative;display:grid;gap:3px}
+.ms-l{font-size:12.5px;color:var(--muted)}
+.ms-b{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 30px 6px 10px;min-width:150px;text-align:left;cursor:pointer;position:relative}
+.ms-b::after{content:"";position:absolute;right:11px;top:50%;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg)}
+.ms-p{position:absolute;right:0;top:100%;margin-top:4px;z-index:15;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(10,30,50,.18);width:max(240px,100%)}
+.ms-a{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--line)}
+.ms-a button{background:none;border:0;color:var(--fiber);font-weight:600;cursor:pointer;padding:2px}
+.ms-list{max-height:260px;overflow:auto;padding:6px 4px}
+.ms-list label{display:flex;gap:8px;align-items:center;padding:5px 8px;border-radius:5px;cursor:pointer;font-size:14px}
+.ms-list label:hover{background:var(--fiber-soft)}
+.ms-list input{accent-color:var(--fiber);width:16px;height:16px}
+.ms-f{padding:8px 10px;border-top:1px solid var(--line);display:flex;justify-content:flex-end}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);margin-bottom:8px}
+.seg button{border:0;background:none;padding:8px 16px;cursor:pointer;font-weight:600;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--fiber);color:#fff}
+.seg-note{margin:0 0 14px}
+.sub{font:600 17px/1.2 var(--cond);margin:0 0 8px}
+.muted{color:var(--muted)}
+.risk{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.02em}
+.risk-h{background:var(--fault-soft);color:var(--fault)}.risk-m{background:var(--amber-soft);color:var(--amber)}.risk-l{background:var(--ok-soft);color:var(--ok)}
+.rk{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.rk li{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.rk-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rk-n{width:22px;height:22px;border-radius:50%;background:var(--ink);color:var(--surface);display:inline-grid;place-items:center;font:600 12px var(--cond)}
+.rk-s{margin-left:auto;color:var(--muted);font-size:13px}
+.rk-bar{position:relative;height:8px;background:var(--bg);border-radius:4px;margin:8px 0 6px}
+.rk-bar i{position:absolute;left:0;top:0;bottom:0;background:var(--fault);border-radius:4px}
+.rk-bar em{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.rk-m{font-size:13px;color:var(--muted)}.rk-m b{color:var(--ink);font-weight:600}
+details.cl summary{cursor:pointer;color:var(--fiber);font-weight:600}
+details.cl div{padding:3px 0;border-top:1px dashed var(--line);font-size:13.5px}
+details.cl[open] summary{margin-bottom:4px}
+.ctw{grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}
+.ct{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.ct-step{border:1px solid var(--line);border-left:3px solid var(--fiber);border-radius:6px;padding:5px 8px;background:var(--bg);min-width:120px;max-width:200px}
+.ct-d{font-size:12px;font-weight:600}.ct-f{font-size:13px}.ct-e{font-size:12px;color:var(--muted)}
+.ct-gap{font-size:12px;color:var(--fault);font-weight:600}
+.pt{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:4px;margin:0 4px 2px 0}
+.pt-bad{background:var(--fault-soft);color:var(--fault)}.pt-warn{background:var(--amber-soft);color:var(--amber)}.pt-muted{background:var(--bg);color:var(--muted)}
+@media (max-width:860px){.ctw{grid-template-columns:1fr}}
+.tbar{display:flex;align-items:center;gap:10px;margin:0 0 6px;flex-wrap:wrap}
+.tcount{font-size:12px;color:var(--muted);margin-left:auto;text-align:right}
+.tsearch{flex:1 1 220px;max-width:340px;border:1px solid var(--line);border-radius:6px;padding:6px 10px 6px 30px;background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235B6D7D' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 9px 50%;color:var(--ink);font-size:14px}
+.tsearch:focus{border-color:var(--fiber)}
+.bigsearch{flex:1 1 320px;max-width:520px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:16px;background:var(--bg);color:var(--ink)}
+.boxcard{margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
+.rk-scroll{max-height:440px;overflow-y:auto;padding-right:4px}
+.panel.key{border:2px solid var(--fault);box-shadow:0 0 0 4px var(--fault-soft)}
+.keytag{display:inline-block;vertical-align:middle;margin-left:8px;font:700 11.5px var(--sans);letter-spacing:.04em;text-transform:uppercase;background:var(--fault);color:#fff;padding:2px 8px;border-radius:999px}
+.rpbar-in{margin:10px 0 0;background:var(--bg)}
+.repbtn{display:inline-flex;align-items:center;gap:7px;align-self:end;padding:7px 14px}
+#rdlg{width:min(560px,94vw)}
+.rf{border:1px solid var(--line);border-radius:8px;padding:8px 12px 10px;margin:0 0 12px}
+.rf legend{font-weight:700;font-size:13px;padding:0 4px}
+.rf label{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:14px;flex-wrap:wrap}
+.rf input[type=radio],.rf input[type=checkbox]{accent-color:var(--fiber);width:16px;height:16px}
+.rrange{margin:4px 0 0 24px}.rrange label{display:grid;gap:2px;font-size:12.5px;color:var(--muted)}
+.rrange input{border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:var(--bg);color:var(--ink)}
+.rsec{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media (max-width:600px){.rsec{grid-template-columns:1fr}}
+.rail .verbtn{width:auto;display:inline-block;text-align:left}
+.verbtn{margin:14px 8px 0;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:var(--rail-ink);border-radius:999px;padding:4px 12px;font-size:12.5px;cursor:pointer}
+.verbtn:hover{background:rgba(255,255,255,.16)}.verbtn b{color:#fff}
+#vdlg{width:min(600px,94vw)}
+.vlist{max-height:60vh;overflow:auto;display:grid;gap:10px;margin-bottom:14px}
+.vitem{border:1px solid var(--line);border-radius:8px;padding:10px 14px}.vitem.cur{border-color:var(--fiber);box-shadow:0 0 0 2px var(--fiber-soft)}
+.vhead{display:flex;gap:10px;align-items:center}.vhead b{font:700 20px var(--cond)}.vhead .muted{margin-left:auto;font-size:13px}
+.vtitle{font-weight:600;margin:2px 0 4px}.vitem ul{margin:4px 0 0;padding-left:18px;font-size:14px}.vitem li{margin:3px 0}
+@media (max-width:860px){.verbtn{display:none}}
+.fold{padding:0}
+.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:14px 18px}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary h2{margin:0;font-size:19px}
+.fold-hint{margin-left:auto;font-size:13px;font-weight:600;color:var(--fiber);display:flex;align-items:center;gap:6px}
+.fold-hint::after{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+.fold[open] .fold-hint{font-size:0}.fold[open] .fold-hint::after{transform:rotate(-135deg);font-size:13px}
+.fold>summary:hover{background:var(--fiber-soft);border-radius:10px}
+.fold-body{padding:0 18px 16px}
+details.more>summary{cursor:pointer;color:var(--fiber);font-weight:600;font-size:13.5px;margin:8px 0 4px;width:max-content}
+details.more[open]>summary{margin-bottom:8px}
+.cards.cards4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:700px){.cards.cards4{grid-template-columns:repeat(2,1fr)}}
+.fbar{display:flex;flex-wrap:wrap;align-items:end;gap:10px}
+.fbar label{font-size:12.5px;color:var(--muted);display:grid;gap:3px}
+.fbar input[type=date],.fbar select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 10px;color:var(--ink);font:inherit;font-size:14px;min-height:36px}
+.fbar select{min-width:190px}
+.nav-d{width:36px;height:36px;border:1px solid var(--line);background:var(--surface);border-radius:6px;font-size:20px;line-height:1;cursor:pointer;color:var(--ink)}
+.nav-d:disabled{opacity:.35;cursor:default}.nav-d:not(:disabled):hover{border-color:var(--fiber);color:var(--fiber)}
+.qk{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.qk button{border:0;background:none;padding:8px 11px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.qk button+button{border-left:1px solid var(--line)}.qk button[aria-pressed="true"]{background:var(--fiber);color:#fff}
+@media (max-width:860px){.fbar{width:100%}.fbar select{min-width:0;width:100%}.fbar label:last-child{flex:1 1 100%}}
+@media (max-width:860px){.rail .verbtn{display:none}}
+.rail .rail-up{justify-content:flex-start;color:#fff}
+.rail-up{display:flex;align-items:center;gap:9px;width:100%;margin:20px 0 0;padding:10px 12px;border:1px solid rgba(255,255,255,.25);border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font:inherit;font-weight:600;cursor:pointer;text-align:left}
+.rail-up svg{width:18px;height:18px;flex:none}
+.rail-up:hover{background:rgba(255,255,255,.18)}
+.rail-up:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.rail ul#nav{margin-top:12px}
+@media (max-width:860px){.rail .rail-up{width:auto;display:inline-flex;margin:8px 0 0;padding:7px 12px;font-size:14px}}
+main{padding-bottom:40px!important}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:13.5px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fiber);border-color:var(--fiber);color:#fff;font-weight:600}
+@media (max-width:860px){.ms{flex:1 1 150px}.ms-b{min-width:0;width:100%}.ms-p{left:0;right:auto}}
+.rpbar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px}
+.rpbar label{font-size:12.5px;color:var(--muted);display:grid;gap:3px}
+.rpbar select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-width:190px}
+.rpinfo{margin-left:auto;font-weight:600;font-size:14px;align-self:center}
+.rpcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px}
+.rpc{border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
+.rpc .rpl{font-size:13px;color:var(--muted);padding:10px 12px 0;min-height:42px}
+.rpc b{font:600 30px/1.1 var(--cond);padding:2px 12px 0;font-variant-numeric:tabular-nums}
+.rpc .rpd{font-size:11.5px;color:var(--muted);padding:0 12px 10px}
+.rpc.hi b{color:var(--fault)}
+.rpavg{margin-top:auto;display:flex;justify-content:space-between;align-items:baseline;gap:6px;background:var(--bg);border-top:1px solid var(--line);padding:7px 12px;font-size:12px;color:var(--muted)}
+.rpavg strong{font:600 17px var(--cond);color:var(--ink)}
+.t-PF{background:var(--fault-soft);color:var(--fault)}
+.lede{color:var(--muted);margin:-8px 0 18px;max-width:75ch}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1px;background:var(--surface);border:1px solid var(--line);box-shadow:inset 0 0 0 1px var(--line);border-radius:10px;overflow:hidden;margin-bottom:22px}
+.card{background:var(--surface);padding:14px 16px;outline:1px solid var(--line)}
+.card b{display:block;white-space:nowrap;font:600 30px/1.05 var(--cond);font-variant-numeric:tabular-nums}
+.card span{font-size:13px;color:var(--muted)}
+.card.hi b{color:var(--fiber)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:18px;margin-bottom:18px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:18px;min-width:0}
+.panel h2{font:600 21px/1.2 var(--cond);margin:0 0 4px}
+.panel p.note{margin:0 0 12px;color:var(--muted);font-size:13.5px}
+.cv{position:relative;height:280px}
+.tw{overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:top}
+td.wrap{white-space:normal;min-width:220px}
+td.wide{min-width:400px;line-height:1.6}
+th{position:sticky;top:0;background:var(--surface);font-weight:600;font-size:12.5px;color:var(--muted);cursor:pointer;user-select:none;z-index:1;box-shadow:0 1px 0 var(--line)}
+th[data-dir="asc"]::after{content:" ▲";font-size:10px}th[data-dir="desc"]::after{content:" ▼";font-size:10px}
+td.n,th.n{text-align:right}
+tbody tr:hover{background:var(--fiber-soft)}
+.tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:12px;font-weight:600}
+.t-TKT{background:var(--fiber-soft);color:var(--fiber)}.t-POI{background:var(--amber-soft);color:var(--amber)}
+.good{color:var(--ok)}.warn{color:var(--amber)}.bad{color:var(--fault)}
+.alerts{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.alerts li{padding:9px 12px 9px 14px;border-left:4px solid var(--fiber);background:var(--fiber-soft);border-radius:0 6px 6px 0;font-size:14.5px}
+.alerts li.warn{border-color:var(--amber);background:var(--amber-soft);color:var(--ink)}
+.alerts li.bad{border-color:var(--fault);background:var(--fault-soft);color:var(--ink)}
+.alerts li.good{border-color:var(--ok);background:var(--ok-soft);color:var(--ink)}
+.empty{max-width:520px;margin:12vh auto;text-align:center}
+.empty h2{font:700 32px/1.1 var(--cond);margin:0 0 8px}.empty p{color:var(--muted)}
+/* shift timeline */
+.gantt{overflow-x:auto}
+.g-row{display:grid;grid-template-columns:190px 1fr 80px;align-items:center;gap:10px;min-width:760px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.g-name{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-name small{color:var(--muted)}
+.g-track{position:relative;height:20px}
+.g-seg{position:absolute;top:3px;height:14px;border-radius:3px}
+.g-seg.TKT{background:var(--fiber)}.g-seg.POI{background:var(--amber)}.g-seg.OTHER{background:var(--muted)}
+.g-travel{position:absolute;top:9px;height:2px;background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}
+.g-axis{display:grid;grid-template-columns:190px 1fr 80px;gap:10px;min-width:760px;font-size:11.5px;color:var(--muted);position:sticky;top:0}
+.g-ticks{position:relative;height:18px}.g-ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.g-first{font:600 14px var(--cond);text-align:right}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--muted);margin:6px 0 10px;flex-wrap:wrap}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+/* pinned upload */
+.fab{position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:20;display:flex;align-items:center;gap:10px;background:var(--fiber);color:#fff;border:0;border-radius:999px;padding:13px 20px 13px 16px;font-weight:600;cursor:pointer;box-shadow:0 6px 20px rgba(13,60,80,.35)}
+.fab svg{width:20px;height:20px}
+.fab:hover{filter:brightness(1.07)}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:22px;width:min(460px,92vw)}
+dialog::backdrop{background:rgba(10,20,30,.55)}
+dialog h2{font:700 24px/1.1 var(--cond);margin:0 0 6px}
+dialog p{color:var(--muted);margin:0 0 14px;font-size:14px}
+.pin{display:flex;gap:8px;margin:6px 0 12px}
+.pin input{width:52px;height:56px;text-align:center;font:600 26px var(--cond);border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:8px 14px;cursor:pointer;font-weight:600}
+.btn.pri{background:var(--fiber);border-color:var(--fiber);color:#fff}
+.btn.danger{color:var(--fault)}
+.msg{font-size:13.5px;min-height:20px;margin:6px 0}
+.msg.err{background:var(--fault-soft);border-left:4px solid var(--fault);padding:8px 10px;border-radius:0 6px 6px 0;font-weight:600}
+.msg.err:empty{display:none}
+.pw{display:grid;gap:4px;font-size:12.5px;color:var(--muted);margin:4px 0 8px}
+.pw input{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:16px;background:var(--bg);color:var(--ink)}
+.pw input.bad-in{border-color:var(--fault);box-shadow:0 0 0 2px var(--fault-soft);animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.msg.err{color:var(--fault)}.msg.ok{color:var(--ok)}
+.daylist{list-style:none;padding:0;margin:8px 0 14px;max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.daylist li{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:14px}
+.set{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 14px}
+.set label{font-size:12.5px;color:var(--muted);display:grid;gap:3px}
+.set input{border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--bg)}
+hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+@media (max-width:860px){.app{grid-template-columns:1fr}nav.rail{position:sticky;height:auto;padding:10px 12px calc(10px);z-index:10;top:0}
+.brand{font-size:20px}.brand small,.rail .days{display:none}.rail ul{display:flex;overflow-x:auto;margin:8px 0 0;gap:4px}.rail button{white-space:nowrap}
+main{padding:16px 14px 110px}.grid2{grid-template-columns:1fr}.bar h1{font-size:28px;width:100%}.fab span{display:none}.fab{padding:15px}}
+.yzo-back{display:inline-block;margin:0 0 14px;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.25);color:var(--rail-ink);text-decoration:none;font-size:13px;font-weight:600}
+.yzo-back:hover{background:rgba(255,255,255,.08)}
+.yzo-back:focus-visible{outline:2px solid var(--fiber);outline-offset:2px}
+@media (max-width:860px){.yzo-back{margin:0 8px 6px 0;padding:4px 10px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="rail" aria-label="Sections">
+  <a class="yzo-back" href="../" aria-label="Back to Impl-Ops main page">← Impl-Ops</a>
+  <div class="brand">Box-Ops<small>Daily report · <span id="verBrand"></span></small></div>
+  <button class="rail-up" id="fab" aria-label="Upload daily file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Upload daily file</span></button>
+  <ul id="nav"></ul>
+  <div class="days" id="dayinfo"></div>
+  <button class="verbtn" id="verBtn" title="Version history">Version <b id="verNo"></b> · history</button>
+</nav>
+<main id="main">
+  <div class="empty"><h2>Loading saved days…</h2><p>Reading the operations history.</p></div>
+</main>
+</div>
+<dialog id="dlg"></dialog>
+<dialog id="rdlg"></dialog>
+<dialog id="vdlg"></dialog>
+<input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv" hidden multiple>
+<script>
+// =====================================================================
+//  SETUP: paste your Supabase Project URL and anon public key below.
+//  Leave both empty to save data in this browser only.
+// =====================================================================
+const SUPABASE_URL = 'https://uemxuinndpaazwxayecv.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_OLHjd18Q8zjcOgr-wPMjWA_w0f0huZf';
+// =====================================================================
+// ---------- version record ----------
+// Every update: add a new entry at the TOP of CHANGELOG and change APP_VERSION.
+const APP_VERSION='v9';
+const CHANGELOG=[
+ {v:'v9',date:'2026-10-28',title:'Upload in the menu',items:[
+  'Upload daily file is now a button in the left menu, above the page list (at the top of the menu on phones).',
+  'The floating upload button at the bottom right is removed, so it no longer covers tables and charts.']},
+ {v:'v8',date:'2026-10-28',title:'Needs attention at the end of Summary',items:[
+  'On the Summary page, Needs attention now comes last, after the key figures, Trend, Township summary and Daily summary.']},
+ {v:'v7',date:'2026-10-28',title:'One-day focus, simple period and township',items:[
+  'Filters are now Start date, End date and Township only (Months, Weeks and the multi-select lists are removed). The portal opens on the latest day.',
+  '‹ › move to the previous / next day with data (or shift a range by its length); quick buttons for 1 day, 7 days and 4 weeks.',
+  'Township is a single choice: all townships or one township.',
+  'Data is kept for 45 days; older days are removed automatically after an upload.',
+  'Trend: Daily view shows every day of the last 4 weeks up to the End date (End date highlighted); Weekly view combines the same 4 weeks into 7-day weeks by township, with All townships first.',
+  'Summary: the Last day / Average switch only appears when the period has more than one day; Tasks per day chart removed (the daily trend covers it).',
+  'Repeat tickets period and PDF report options follow the new Start / End date (no month option).']},
+ {v:'v6',date:'2026-10-28',title:'Cleaner layout',items:[
+  'Removed charts and lists that repeated other information: Tasks by township (Summary), Tasks per engineer (KPI), Engineers and cars by SR, Boxes per site, Resolve summary by bucket, Duration average by township, Root cause lists (categories, causes, resolutions), Re-opened tickets on Root cause (kept on Repeat tickets), figure chips in Repeat detail.',
+  'Summary shows 8 key figures in two even rows; Tasks per day appears only when more than one day is selected; Township summary keeps 11 columns (resolve days, dBm and unique boxes are on their own pages).',
+  'Detail tables are folded: tap a section title (Show details) to open it.',
+  'Needs attention lists show the 4 most important items first (red before amber), with Show more for the rest.',
+  'Weekly trend shows the chart; the numbers table opens with Show the numbers.',
+  'Repeat tickets: 6 summary figures instead of 9, shorter intro, Repeat attention merged into the findings of Who did the visit before the repeat and Customer history, boxes table folded.']},
+ {v:'v5',date:'2026-10-28',title:'Hide Others when empty',items:[
+  'Others is only shown when it has data in the selected period: in the filter, tables, charts and the weekly trend.',
+  'Weekly trend lists only townships with data in the days shown, with Others last.']},
+ {v:'v4',date:'2026-10-28',title:'Short township codes',items:[
+  'Townships are shown as short codes everywhere: NAY North Okkalapa, TAY Thaketa, TNY Thingangyun, MTY Mingalar Taung Nyunt, TEY Tarmwe, SAY South Okkalapa, DOY Dawbon.',
+  'Any other township, or a blank township, is grouped as Others.',
+  'Already saved days are converted automatically when the portal loads; new uploads are saved with the codes.',
+  'The Townships filter lists each code with its full name; the code list is also shown on the Township & SR page.']},
+ {v:'v3',date:'2026-10-28',title:'Weekly trend: township per dates',items:[
+  'Weekly trend by township now shows townships along the bottom, with one bar per date for each township.',
+  'Date bars are shaded from light (older) to dark (newest) so the change over the week is easy to read.']},
+ {v:'v2',date:'2026-10-28',title:'Charts: bar and pie only',items:[
+  'Weekly trend by township now uses grouped bar charts (one bar per township for each day) instead of lines.',
+  'Signal (dBm): max and min per day shown as grouped bars instead of a line.',
+  'Root cause category and cable type usage shown as pie charts, with the share (%) in the tooltip.',
+  'All other charts stay as bar charts.']},
+ {v:'v1',date:'2026-10-02',title:'First release',items:[
+  'Daily Excel upload, saved by Schedule Date; keeps the latest 45 days (from v7) and removes older days automatically.',
+  'Filters: Months, Weeks, Days and Townships, each with multiple selection.',
+  'Summary: last day or Average of the filter, key figures, Needs attention, weekly trend by township (KPI, engineers, tickets, POI, cars, labour, within 1 day, fiber, ticket and POI time).',
+  'Engineer KPI by day, SR and township; Township & SR resources (engineers, cars, labour split on "/").',
+  'Boxes & sites with unique box counts and a Find a box search.',
+  'Resolve time, Arrival (AM / PM, shift timeline), Duration, Root cause, Signal (dBm), Cable & fiber.',
+  'Repeat tickets (tickets only, POI not counted): period filter (default 30 days up to the selected day), Who did the visit before the repeat, Repeat detail, Customer history.',
+  'Key metric: Repeated – POI after first ticket.',
+  'Customer ID (column H) shown instead of Task No.',
+  'Search box on every table; all records shown for the selected period.',
+  'Generate report: PDF for any period, with selectable sections.',
+  'Shared online storage through Supabase when configured; otherwise saved in this browser.']}
+];
+function showVersions(){const d=$('#vdlg');
+  d.innerHTML=`<h2>Version history</h2><p>You are using <b>${APP_VERSION}</b>.</p>
+   <div class="vlist">${CHANGELOG.map((c,i)=>`<section class="vitem${i===0?' cur':''}"><div class="vhead"><b>${esc(c.v)}</b>${i===0?'<span class="risk risk-l">Current</span>':''}<span class="muted">${dlabel(c.date)}</span></div>${c.title?`<div class="vtitle">${esc(c.title)}</div>`:''}<ul>${c.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}</div>
+   <div class="row"><button class="btn" onclick="document.getElementById('vdlg').close()">Close</button></div>`;
+  d.showModal();}
+document.addEventListener('click',e=>{if(e.target.closest('#verBtn'))showVersions();});
+const TWN_CODE={northokkalapa:'NAY',thaketa:'TAY',thingangyun:'TNY',mingalartaungnyunt:'MTY',tarmwe:'TEY',southokkalapa:'SAY',dawbon:'DOY'};
+const TWN_FULL={NAY:'North Okkalapa',TAY:'Thaketa',TNY:'Thingangyun',MTY:'Mingalar Taung Nyunt',TEY:'Tarmwe',SAY:'South Okkalapa',DOY:'Dawbon',Others:'Any other township'};
+const twnCode=v=>{const k=String(v==null?'':v).toLowerCase().replace(/[^a-z]/g,'');if(TWN_CODE[k])return TWN_CODE[k];const u=String(v||'').trim().toUpperCase();return TWN_FULL[u]&&u!=='OTHERS'?u:'Others';};
+const BOX_F=['date','task','type','box','created','twn','sr','eng','car','lab','srdep','arr','dep','dur','rcc','src','res','res2','status','db','cable','fiber','reopen','sid','cust'];
+function parseWorkbook(XLSX, wb){
+  const norm=s=>String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,'');
+  const L=l=>{let n=0;for(const c of l)n=n*26+(c.charCodeAt(0)-64);return n-1;};
+  const want={date:['scheduledate','A'],task:['taskno','C'],box:['boxname','M'],created:['ticketcreatedate','P'],twn:['township','T'],sr:['srname','AI'],eng:['lanengineername','AK'],car:['carid','AN'],lab:['contractorofficelabourid','AP'],srdep:['srdeparturetime','AO'],arr:['engrarrivaltime','AV'],dep:['engrdeparturetime','AW'],dur:['timeduration','AX'],rcc:['rootcausecategory','AZ'],src:['servicerootcause','BA'],res:['onsiteresolution','BB'],res2:['onsiteresolution2','BC'],status:['taskstatus','BD'],db:['afterdbm','BJ'],cable:['usagecabletype','BW'],fiber:['fiberusagemeter','BZ'],reopen:['reopeningcounts','G'],sid:['localserviceid','H'],cust:['customername','Q']};
+  const pad=n=>String(n).padStart(2,'0');
+  const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  const toDate=v=>{
+    if(v==null||v==='')return null;
+    if(typeof v==='number'){const d=new Date(Math.round((v-25569)*86400000));return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());}
+    if(v instanceof Date)return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());
+    const s=String(v).trim();let m;
+    if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))return m[1]+'-'+pad(m[2])+'-'+pad(m[3]);
+    if(m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/))return m[3]+'-'+pad(m[1])+'-'+pad(m[2]);
+    if(m=s.match(/^(\d{1,2})[\s-]([A-Za-z]{3})[a-z]*[\s-](\d{2,4})/)){const y=m[3].length==2?'20'+m[3]:m[3];const mo=MON[m[2].toLowerCase()];if(mo)return y+'-'+pad(mo)+'-'+pad(m[1]);}
+    return null;};
+  const toMin=(v,total)=>{
+    if(v==null||v==='')return null;
+    if(typeof v==='number'){const x=total?v:(v%1);return Math.round(x*1440);}
+    if(v instanceof Date)return v.getHours()*60+v.getMinutes();
+    const m=String(v).trim().match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if(!m)return null;let h=+m[1];const mi=+m[2];
+    if(m[4]){const pm=m[4].toLowerCase()=='pm';if(pm&&h<12)h+=12;if(!pm&&h==12)h=0;}
+    return h*60+mi+Math.round((+m[3]||0)/60);};
+  const num=v=>{if(v==null||v==='')return null;const n=typeof v==='number'?v:parseFloat(String(v).replace(/[^0-9.\-]/g,''));return isFinite(n)?n:null;};
+  const str=v=>{if(v==null)return null;const s=String(v).trim();return (s===''||s==='-'||s==='0'||s.toLowerCase()==='nan'||s.toLowerCase()==='n/a')?null:s;};
+  const out=[];
+  for(const name of wb.SheetNames){
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null});
+    let hr=-1;for(let i=0;i<Math.min(8,aoa.length);i++){if((aoa[i]||[]).some(c=>norm(c)==='taskno')){hr=i;break;}}
+    if(hr<0)continue;
+    const H=aoa[hr].map(norm);const idx={};
+    for(const k in want){const [h,l]=want[k];let i=H.indexOf(h);if(i<0&&k==='reopen')i=H.findIndex(x=>x.startsWith(h));if(i<0)i=L(l);idx[k]=i;}
+    for(let r=hr+1;r<aoa.length;r++){
+      const row=aoa[r]||[];const g=k=>row[idx[k]];
+      const task=str(g('task'));const date=toDate(g('date'));
+      if(!task||!date)continue;
+      const T=task.toUpperCase();
+      out.push({date,task,type:T.includes('TKT')?'TKT':T.includes('POI')?'POI':'OTHER',box:str(g('box')),created:toDate(g('created')),
+        twn:twnCode(str(g('twn'))),sr:str(g('sr'))||'Unknown',eng:str(g('eng'))||'Unassigned',car:str(g('car')),lab:str(g('lab')),
+        srdep:toMin(g('srdep')),arr:toMin(g('arr')),dep:toMin(g('dep')),dur:toMin(g('dur'),true),
+        rcc:str(g('rcc'))||'Not set',src:str(g('src'))||'Not set',res:str(g('res'))||'Not set',res2:str(g('res2')),
+        status:str(g('status'))||'',db:num(g('db')),cable:str(g('cable'))||'Not set',fiber:num(g('fiber'))||0,reopen:num(g('reopen'))||0,sid:str(g('sid')),cust:str(g('cust'))});
+    }
+  }
+  return out;
+}
+
+// ---------- state ----------
+const S={rows:[],days:{},settings:{target:4,late:'10:00',pinHash:null},view:'summary',dates:[],twns:[],months:[],weeks:[],rpPeriod:'30',rpKind:'all',trend:'kpi',trendMode:'day',from:null,to:null,twn:'all',sumMode:'last',db:null,unlocked:false};
+const charts={};const TABLES={};let tid=0;
+const LS='boxops-v1';
+const VIEWS=[['summary','Summary'],['kpi','Engineer KPI'],['teams','Township & SR'],['boxes','Boxes & sites'],['resolve','Resolve time'],['arrival','Arrival'],['duration','Duration'],['root','Root cause'],['repeat','Repeat tickets'],['signal','Signal (dBm)'],['cable','Cable & fiber']];
+
+// ---------- helpers ----------
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const sum=a=>a.reduce((s,x)=>s+(+x||0),0);
+const avg=a=>{const b=a.filter(x=>x!=null&&isFinite(x));return b.length?sum(b)/b.length:null;};
+const med=a=>{const b=a.filter(x=>x!=null&&isFinite(x)).sort((x,y)=>x-y);if(!b.length)return null;const m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2;};
+const uniq=a=>[...new Set(a.filter(x=>x!=null&&x!==''))];
+const groupBy=(a,f)=>{const m=new Map();for(const x of a){const k=typeof f==='function'?f(x):x[f];if(!m.has(k))m.set(k,[]);m.get(k).push(x);}return m;};
+const countBy=(a,f)=>[...groupBy(a,f)].map(([k,v])=>[k,v.length]).sort((x,y)=>y[1]-x[1]);
+// clock time in 12-hour format with AM / PM, e.g. 9:15 AM, 1:03 PM
+const hm=m=>{if(m==null||!isFinite(m))return '–';m=Math.round(m);m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mi=m%60,h12=h%12||12;return h12+':'+String(mi).padStart(2,'0')+' '+(h<12?'AM':'PM');};
+const hmShort=m=>{m=Math.round(m);const h=Math.floor(((m%1440)+1440)%1440/60),h12=h%12||12;return h12+' '+(h<12?'AM':'PM');};
+const dur=m=>{if(m==null||!isFinite(m))return '–';m=Math.round(m);const h=Math.floor(m/60);return h?h+'h '+String(m%60).padStart(2,'0')+'m':m+'m';};
+const f1=n=>n==null||!isFinite(n)?'–':(Math.round(n*10)/10).toLocaleString();
+const f2=n=>n==null||!isFinite(n)?'–':n.toFixed(2);
+const int=n=>n==null?'–':Math.round(n).toLocaleString();
+const pct=(a,b)=>b?Math.round(a/b*100)+'%':'–';
+const dlabel=d=>{if(!d)return '–';const [y,m,dd]=d.split('-');return +dd+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1]+' '+y;};
+const daysBetween=(a,b)=>(a&&b)?Math.round((Date.UTC(...a.split('-').map((x,i)=>i==1?x-1:+x))-Date.UTC(...b.split('-').map((x,i)=>i==1?x-1:+x)))/86400000):null;
+const isKpi=r=>!/no\s*kpi/i.test(r.status||'');
+// Labour (AP): split on "/", each part is one labourer; blank or "No…" parts count 0
+const labs=r=>r.lab?String(r.lab).split('/').map(x=>x.trim()).filter(x=>x&&!/^no\b/i.test(x)&&x!=='-'&&x!=='0'):[];
+const labN=r=>labs(r).length;const hasLab=r=>labN(r)>0;
+const labIds=a=>uniq(a.flatMap(labs));
+const multiDay=()=>uniq(filtered().map(r=>r.date)).length!==1;
+const lateMin=()=>{const [h,m]=(S.settings.late||'10:00').split(':');return (+h)*60+(+m||0);};
+const dbClass=v=>v==null?'':v<-27?'bad':v<-25?'warn':'good';
+
+// ---------- table ----------
+function tbl(cols,rows,opt={}){
+  const id='t'+(++tid);const all=rows.slice();
+  // search text per row: raw values + displayed text of every column
+  const strip=h=>String(h).replace(/<[^>]*>/g,' ');
+  all.forEach(r=>{try{r.__s=cols.map(c=>{const v=typeof c.k==='function'?c.k(r):r[c.k];let t=v==null?'':(typeof v==='object'?'':String(v));if(c.f){try{t+=' '+strip(c.f(v,r));}catch(e){}}return t;}).join(' ').toLowerCase();}catch(e){r.__s='';}});
+  TABLES[id]={cols,all,rows:all.slice(),q:'',sort:null,h:opt.h};
+  const head=cols.map((c,i)=>`<th class="${c.n?'n':''}" data-t="${id}" data-i="${i}" scope="col">${esc(c.l)}</th>`).join('');
+  const sb=all.length>3?`<input type="search" class="tsearch" data-ts="${id}" placeholder="Search this table…" aria-label="Search this table">`:'';
+  return `<div class="tbar">${sb}<span class="tcount" id="${id}-c">${countTxt(id)}</span></div><div class="tw" ${opt.h?`style="max-height:${opt.h}px"`:opt.h===0?'style="max-height:none"':''}><table id="${id}"><thead><tr>${head}</tr></thead><tbody>${body(id)}</tbody></table></div>`;
+}
+function countTxt(id){const T=TABLES[id];const n=T.rows.length,N=T.all.length;
+  return (T.q?`${n} of ${N} record${N===1?'':'s'}`:`${N} record${N===1?'':'s'}`)+(T.h!==0&&n>12?' · scroll to see all':'');}
+function body(id){const {cols,rows,q}=TABLES[id];if(!rows.length)return `<tr><td colspan="${cols.length}" style="color:var(--muted)">${q?'No match for “'+esc(q)+'”.':'No rows for this selection.'}</td></tr>`;
+  return rows.map(r=>'<tr>'+cols.map(c=>{const v=typeof c.k==='function'?c.k(r):r[c.k];const out=c.f?c.f(v,r):esc(v==null?'–':v);return `<td class="${c.n?'n':''} ${c.w?'wrap':''} ${c.c?c.c(v,r):''}">${out}</td>`;}).join('')+'</tr>').join('');}
+function applyTable(id){const T=TABLES[id];const words=T.q.toLowerCase().split(/\s+/).filter(Boolean);
+  T.rows=words.length?T.all.filter(r=>words.every(w=>r.__s.includes(w))):T.all.slice();if(T.sort)T.rows.sort(T.sort);
+  document.querySelector('#'+id+' tbody').innerHTML=body(id);const c=document.getElementById(id+'-c');if(c)c.textContent=countTxt(id);}
+document.addEventListener('input',e=>{const i=e.target.closest('input[data-ts]');if(!i)return;const T=TABLES[i.dataset.ts];if(!T)return;T.q=i.value.trim();applyTable(i.dataset.ts);});
+document.addEventListener('click',e=>{const th=e.target.closest('th[data-t]');if(!th)return;const T=TABLES[th.dataset.t];const c=T.cols[th.dataset.i];
+  const dir=th.dataset.dir==='desc'?'asc':'desc';th.closest('tr').querySelectorAll('th').forEach(x=>delete x.dataset.dir);th.dataset.dir=dir;
+  const g=r=>{const v=c.s?c.s(r):(typeof c.k==='function'?c.k(r):r[c.k]);return v==null?(dir==='asc'?Infinity:-Infinity):v;};
+  T.sort=(a,b)=>{const x=g(a),y=g(b);const r=typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y));return dir==='asc'?r:-r;};
+  applyTable(th.dataset.t);});
+
+// ---------- charts ----------
+function chart(id,type,labels,datasets,o={}){
+  if(charts[id]){charts[id].destroy();delete charts[id];}
+  const el=document.getElementById(id);if(!el||typeof Chart==='undefined')return;
+  const grid=css('--line'),tick=css('--muted');
+  const round=type==='doughnut'||type==='pie';const scales=round?{}:{x:{stacked:!!o.stacked,grid:{color:grid},ticks:{color:tick,autoSkip:false,maxRotation:60}},y:{stacked:!!o.stacked,grid:{color:grid},ticks:{color:tick},beginAtZero:o.zero!==false,title:o.yt?{display:true,text:o.yt,color:tick}:undefined}};
+  if(o.horizontal){scales.x.ticks.autoSkip=true;scales.x.ticks.maxRotation=0;scales.y.ticks.autoSkip=false;}
+  charts[id]=new Chart(el,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,indexAxis:o.horizontal?'y':'x',animation:false,
+    plugins:{legend:{display:datasets.length>1||round,position:'bottom',labels:{color:tick,boxWidth:12}},tooltip:{callbacks:o.tip?{label:o.tip}:round?{label:c=>{const t=c.dataset.data.reduce((a,b)=>a+(+b||0),0);return ` ${c.label}: ${c.parsed} (${t?Math.round(c.parsed/t*100):0}%)`;}}:{}}},scales}});
+}
+const C=()=>({fiber:css('--fiber'),amber:css('--amber'),fault:css('--fault'),ok:css('--ok'),muted:css('--muted'),ink:css('--ink')});
+const PAL=()=>{const c=C();return [c.fiber,c.amber,c.ink,c.fault,c.ok,c.muted,'#7A5BA8','#3E8ED0','#C4588C','#8A9A3A'];};
+
+// ---------- data access ----------
+const monthOf=d=>d.slice(0,7);
+const weekOf=d=>{const [y,m,dd]=d.split('-').map(Number);const t=new Date(Date.UTC(y,m-1,dd));const wd=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-wd);return t.toISOString().slice(0,10);};
+const addDays=(d,n)=>{const [y,m,dd]=d.split('-').map(Number);const t=new Date(Date.UTC(y,m-1,dd+n));return t.toISOString().slice(0,10);};
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const monthLabel=k=>MN[+k.slice(5,7)-1]+' '+k.slice(0,4);
+const isoWeekNo=mon=>{const [y,m,d]=mon.split('-').map(Number);const t=new Date(Date.UTC(y,m-1,d+3));const y0=new Date(Date.UTC(t.getUTCFullYear(),0,4));return 1+Math.round(((t-y0)/86400000-3+((y0.getUTCDay()+6)%7))/7);};
+const weekLabel=k=>{const e=addDays(k,6);const a=+k.slice(8),b=+e.slice(8);return 'Week '+isoWeekNo(k)+' · '+a+(k.slice(5,7)!==e.slice(5,7)?' '+MN[+k.slice(5,7)-1]:'')+'–'+b+' '+MN[+e.slice(5,7)-1];};
+const inPeriod=d=>(!S.months.length||S.months.includes(monthOf(d)))&&(!S.weeks.length||S.weeks.includes(weekOf(d)))&&(!S.dates.length||S.dates.includes(d));
+function filtered(){const T=new Set(S.twns);return S.rows.filter(r=>inPeriod(r.date)&&(!T.size||T.has(r.twn)));}
+// repeat tickets: same Local Service ID gets a new ticket within 30 days of a previous visit
+// Repeat kinds (same Local Service ID, column H, within 30 days):
+//  'Repeat ticket'            ticket after an earlier ticket
+//  'Ticket after POI install' ticket after an earlier POI install
+//  'POI after first ticket'   POI task after the customer's first ticket
+const RK=['Repeat ticket','Ticket after POI install','POI after first ticket'];
+function repeatPairs(rows){const out=[];
+  for(const [sid,a0] of groupBy(rows.filter(r=>r.sid&&(r.type==='TKT'||r.type==='POI')),'sid')){if(a0.length<2)continue;
+    const a=[...a0].sort((x,y)=>x.date.localeCompare(y.date)||(x.arr??0)-(y.arr??0));
+    for(let i=1;i<a.length;i++){const cur=a[i];let prev=null,kind=null;
+      if(cur.type==='TKT'){prev=a[i-1];kind=prev.type==='POI'?RK[1]:RK[0];}
+      else{prev=a.slice(0,i).find(x=>x.type==='TKT'&&daysBetween(cur.date,x.date)<=30)||null;kind=RK[2];}
+      if(!prev)continue;const gap=daysBetween(cur.date,prev.date);if(gap>30)continue;
+      out.push({sid,cust:cur.cust||prev.cust,twn:cur.twn,box:cur.box||prev.box,gap,kind,
+        pDate:prev.date,pType:prev.type,pEng:prev.eng,pRes:prev.res,pSrc:prev.src,cDate:cur.date,cType:cur.type,cEng:cur.eng,cSrc:cur.src,cRes:cur.res,same:prev.eng===cur.eng});}}
+  return out.sort((x,y)=>y.cDate.localeCompare(x.cDate)||x.gap-y.gap);}
+function engDays(rows){ // engineer-day aggregates
+  return [...groupBy(rows,r=>r.date+'|'+r.eng)].map(([k,a])=>{
+    const k2=a.filter(isKpi);const firstArr=Math.min(...a.map(r=>r.arr).filter(x=>x!=null));const lastDep=Math.max(...a.map(r=>r.dep).filter(x=>x!=null));
+    return {date:a[0].date,eng:a[0].eng,sr:uniq(a.map(r=>r.sr)).join(', '),twn:uniq(a.map(r=>r.twn)).join(', '),car:uniq(a.map(r=>r.car)).join(', '),lab:labIds(a).join(', '),
+      tkt:a.filter(r=>r.type==='TKT').length,poi:a.filter(r=>r.type==='POI').length,tasks:a.length,kpi:k2.length,ach:k2.length/(+S.settings.target||1),
+      avgDur:avg(a.map(r=>r.dur)),onsite:sum(a.map(r=>r.dur)),first:isFinite(firstArr)?firstArr:null,last:isFinite(lastDep)?lastDep:null,
+      srdep:Math.min(...a.map(r=>r.srdep).filter(x=>x!=null)),db:avg(a.map(r=>r.db)),fiber:sum(a.map(r=>r.fiber)),rows:a};});
+}
+function kpiGroup(rows,key){ // average KPI per engineer-day within a group
+  return [...groupBy(rows,key)].map(([k,a])=>{const ed=engDays(a);const n=ed.length;
+    return {k,engs:uniq(a.map(r=>r.eng)).length,engDays:n,tasks:a.length,kpi:sum(ed.map(e=>e.kpi)),avgKpi:n?sum(ed.map(e=>e.kpi))/n:null,avgTkt:n?sum(ed.map(e=>e.tkt))/n:null,avgPoi:n?sum(ed.map(e=>e.poi))/n:null,
+      ach:n?sum(ed.map(e=>e.kpi))/n/(+S.settings.target||1):null,hit:ed.filter(e=>e.kpi>=+S.settings.target).length,avgDur:avg(a.map(r=>r.dur))};}).sort((x,y)=>(y.avgKpi||0)-(x.avgKpi||0));
+}
+function teamGroup(rows,key){
+  return [...groupBy(rows,key)].map(([k,a])=>{const e=uniq(a.map(r=>r.eng)).length,c=uniq(a.map(r=>r.car)).length,l=labIds(a).length;
+    return {k,eng:e,car:c,lab:l,noLab:a.filter(r=>!hasLab(r)).length,labSlots:sum(a.map(labN)),tasks:a.length,tkt:a.filter(r=>r.type==='TKT').length,poi:a.filter(r=>r.type==='POI').length,carPerEng:e?c/e:null,engPerCar:c?e/c:null,labPerEng:e?l/e:null};}).sort((x,y)=>y.tasks-x.tasks);
+}
+
+// ---------- attention engine ----------
+function alerts(rows,which){
+  const A=[];const add=(lvl,html)=>A.push({lvl,html});if(!rows.length)return A;
+  const T=+S.settings.target;
+  if(!which||which==='kpi'){const ed=engDays(rows);const below=ed.filter(e=>e.kpi<T);
+    if(ed.length){const best=[...ed].sort((a,b)=>b.kpi-a.kpi)[0];add('good',`Top performer: <b>${esc(best.eng)}</b> closed ${best.kpi} KPI tasks on ${dlabel(best.date)}.`);}
+    if(below.length)add(below.length/ed.length>.5?'bad':'warn',`${below.length} of ${ed.length} engineer-days are below the daily target of ${T} tasks (${pct(below.length,ed.length)}).`);
+    const nk=rows.filter(r=>!isKpi(r));if(nk.length)add('warn',`${nk.length} task(s) marked “No KPI” are excluded from KPI counts.`);}
+  if(!which||which==='resolve'){const d=rows.map(r=>daysBetween(r.date,r.created)).filter(x=>x!=null);const slow=rows.filter(r=>daysBetween(r.date,r.created)>2);
+    if(slow.length){const w=[...slow].sort((a,b)=>daysBetween(b.date,b.created)-daysBetween(a.date,a.created))[0];add('bad',`${slow.length} task(s) took more than 2 days from creation to resolve. Oldest: customer <b>${esc(w.sid||'–')}</b> (${daysBetween(w.date,w.created)} days, ${esc(w.twn)}).`);}
+    add('good',`${pct(d.filter(x=>x<=1).length,d.length)} of tasks were resolved within 1 day of creation; average is ${f1(avg(d))} days.`);}
+  if(!which||which==='arrival'){const ed=engDays(rows).filter(e=>e.first!=null);const L=lateMin();
+    if(ed.length){const e0=[...ed].sort((a,b)=>a.first-b.first)[0],e1=[...ed].sort((a,b)=>b.first-a.first)[0];
+      add('good',`Earliest first arrival: <b>${esc(e0.eng)}</b> at ${hm(e0.first)}${multiDay()?' ('+dlabel(e0.date)+')':''}.`);
+      add('warn',`Latest first arrival: <b>${esc(e1.eng)}</b> at ${hm(e1.first)}${multiDay()?' ('+dlabel(e1.date)+')':''}.`);
+      const late=ed.filter(e=>e.first>L);if(late.length)add('bad',`${late.length} engineer-day(s) reached their first site after ${hm(lateMin())}: ${late.map(e=>esc(e.eng)).join(', ')}.`);}}
+  if(!which||which==='duration'){const lg=rows.filter(r=>r.dur>120);if(lg.length)add('warn',`${lg.length} task(s) took longer than 2 hours on site. Longest: customer <b>${esc([...lg].sort((a,b)=>b.dur-a.dur)[0].sid||'–')}</b> (${dur(Math.max(...lg.map(r=>r.dur)))}).`);}
+  if(!which||which==='root'){const c=countBy(rows,'rcc'),s=countBy(rows,'src');
+    if(c[0])add(c[0][1]/rows.length>.4?'warn':'good',`Main root cause category is <b>${esc(c[0][0])}</b>: ${c[0][1]} tasks (${pct(c[0][1],rows.length)}).`);
+    if(s[0])add('warn',`Most frequent service root cause: <b>${esc(s[0][0])}</b> (${s[0][1]} tasks).`);
+    const ro=rows.filter(r=>r.reopen>=1);if(ro.length){const top=[...ro].sort((a,b)=>b.reopen-a.reopen);add('bad',`${ro.length} ticket(s) re-opened in the past 30 days (re-open count 1 or more; ${int(sum(ro.map(r=>r.reopen)))} re-opens in total). Highest: customer <b>${esc(top[0].sid||'–')}</b> with ${top[0].reopen}. See Re-opened per system on Repeat tickets.`);}}
+  if(!which||which==='repeat'){const ds=uniq(rows.map(r=>r.date)).sort(),DS=new Set(ds),TW=new Set(rows.map(r=>r.twn));const hist=ds.length?S.rows.filter(r=>r.date<=ds[ds.length-1]&&r.date>=addDays(ds[0],-30)&&TW.has(r.twn)):[];const rpAll=repeatPairs(hist).filter(p=>DS.has(p.cDate));const rp=rpAll.filter(x=>x.kind!==RK[2]);const pf=rpAll.filter(x=>x.kind===RK[2]).length;if(rp.length){const top=countBy(rp,'pEng')[0];add('bad',`${rp.length} repeat ticket(s) from ${uniq(rp.map(r=>r.sid)).length} customer(s) within 30 days. Most repeats after <b>${esc(top[0])}</b>'s visits (${top[1]}). See Repeat tickets.`);}if(pf)add('bad',`<b>Repeated – POI after first ticket:</b> ${pf} POI task(s) came within 30 days of the customer's first ticket. See Repeat tickets.`);}
+  if(!which||which==='boxes'){const rep=countBy(rows.filter(r=>r.box),'box').filter(x=>x[1]>=3);if(rep.length)add('bad',`Box <b>${esc(rep[0][0])}</b> was visited ${rep[0][1]} times${rep.length>1?`; ${rep.length} boxes have 3+ visits`:''}. Possible box-side fault.`);}
+  if(!which||which==='signal'){const b=rows.filter(r=>r.db!=null&&r.db<-27),w=rows.filter(r=>r.db!=null&&r.db<-25&&r.db>=-27),miss=rows.filter(r=>r.db==null);
+    if(b.length)add('bad',`${b.length} task(s) closed with After dBm below −27 (weak signal). Worst: customer <b>${esc([...b].sort((x,y)=>x.db-y.db)[0].sid||'–')}</b> at ${f2(Math.min(...b.map(r=>r.db)))} dBm.`);
+    if(w.length)add('warn',`${w.length} task(s) between −25 and −27 dBm; borderline.`);if(miss.length)add('warn',`${miss.length} task(s) have no After dBm recorded.`);}
+  if(!which||which==='cable'){const fm=sum(rows.map(r=>r.fiber));add('good',`${int(fm)} m of fiber used across ${rows.filter(r=>r.fiber>0).length} tasks.`);}
+  return A;
+}
+const alertList=a=>{if(!a.length)return '<p class="note">Nothing needs attention for this selection.</p>';const o={bad:0,warn:1,good:2};a=[...a].sort((x,y)=>o[x.lvl]-o[y.lvl]);
+  const li=x=>`<li class="${x.lvl}">${x.html}</li>`;const top=a.slice(0,4),more=a.slice(4);
+  return `<ul class="alerts">${top.map(li).join('')}</ul>`+(more.length?`<details class="more"><summary>Show ${more.length} more</summary><ul class="alerts">${more.map(li).join('')}</ul></details>`:'');};
+// ---------- views ----------
+const V={};
+const panel=(t,note,inner)=>`<section class="panel"><h2>${t}</h2>${note?`<p class="note">${note}</p>`:''}${inner}</section>`;
+// collapsed section for detail tables (open on tap)
+const fold=(t,note,inner)=>`<details class="panel fold"><summary><h2>${t}</h2><span class="fold-hint">Show details</span></summary><div class="fold-body">${note?`<p class="note">${note}</p>`:''}${inner}</div></details>`;
+// removed section (duplicate information)
+const skip=()=>'';
+const cv=(id,h)=>`<div class="cv" style="${h?'height:'+h+'px':''}"><canvas id="${id}" role="img" aria-label="${id}"></canvas></div>`;
+const card=(v,l,hi)=>`<div class="card ${hi?'hi':''}"><b>${v}</b><span>${l}</span></div>`;
+const typeTag=t=>`<span class="tag t-${t}">${t==='TKT'?'Ticket':t}</span>`;
+
+// stats for one set of rows (one day, or pooled)
+function sStats(a){const e=engDays(a);const tk=a.filter(r=>r.type==='TKT'),po=a.filter(r=>r.type==='POI');const d=a.map(r=>daysBetween(r.date,r.created)).filter(x=>x!=null);const T=+S.settings.target;
+  return {kpi:e.length?sum(e.map(x=>x.kpi))/e.length:null,eng:uniq(a.map(r=>r.eng)).length,tkt:tk.length,poi:po.length,fiber:sum(a.map(r=>r.fiber)),car:uniq(a.map(r=>r.car)).length,
+    lab:labIds(a).length,box:uniq(a.filter(r=>r.box).map(r=>r.box.trim().toUpperCase())).length,visits:a.filter(r=>r.box).length,td:avg(tk.map(r=>r.dur)),pd:avg(po.map(r=>r.dur)),r1:d.length?d.filter(x=>x<=1).length/d.length:null,db:avg(a.map(r=>r.db)),
+    hit:e.length?e.filter(x=>x.kpi>=T).length/e.length:null,rd:avg(d),weak:a.filter(r=>r.db!=null&&r.db<-25).length};}
+// avg mode: counts = mean per day, rates = pooled over all rows
+const COUNTS=['eng','tkt','poi','fiber','car','lab','weak'];
+function sAvg(a){const P=sStats(a);const D=[...groupBy(a,'date')].map(([,x])=>sStats(x));const o={...P,days:D.length};for(const k of COUNTS)o[k]=avg(D.map(x=>x[k]));return o;}
+V.summary=rows=>{
+  const days=uniq(rows.map(r=>r.date)).sort();const last=days[days.length-1];const isAvg=S.sumMode==='avg';
+  const cur=isAvg?rows:rows.filter(r=>r.date===last);const st=isAvg?sAvg(rows):sStats(cur);
+  const T=+S.settings.target;const pd=isAvg?' (avg / day)':'';const n1=v=>isAvg?f1(v):int(v);
+  const toggle=`<div class="seg" role="group" aria-label="Summary view">
+     <button data-summode="last" aria-pressed="${!isAvg}">Last day · ${dlabel(last)}</button>
+     <button data-summode="avg" aria-pressed="${isAvg}">Average · ${days.length} day${days.length>1?'s':''}</button></div>
+   <p class="lede seg-note">${isAvg?`Average of all ${days.length} day${days.length>1?'s':''} in your filter (${dlabel(days[0])} to ${dlabel(last)}). Counts are per-day averages; times, KPI and percentages use every task in the filter.`:`Showing the latest day in your filter. Press <b>Average</b> to see the average of all ${days.length} filtered day${days.length>1?'s':''}.`}</p>`;
+  const h=`<div class="cards cards4">
+   ${card(f1(st.kpi),'Average KPI (tasks per engineer-day)',1)}
+   ${card(n1(st.eng),'LAN engineers'+pd)}
+   ${card(n1(st.tkt),'Tickets done'+pd)}${card(n1(st.poi),'POI installs done'+pd)}
+   ${card(int(st.fiber)+' m','Fiber used'+pd)}
+   ${card(dur(st.td),'Avg ticket duration')}${card(dur(st.pd),'Avg POI duration')}
+   ${card(st.r1==null?'–':Math.round(st.r1*100)+'%','Resolved within 1 day')}
+  </div>`;
+  const byT=[...groupBy(cur,'twn')].map(([k,a])=>({k,...(isAvg?sAvg(a):sStats(a))})).sort((a,b)=>(b.tkt+b.poi)-(a.tkt+a.poi));
+  const byD=[...groupBy(rows,'date')].map(([k,a])=>{const db=a.map(r=>r.db).filter(x=>x!=null);return {k,...sStats(a),mx:db.length?Math.max(...db):null,mn:db.length?Math.min(...db):null,twn:uniq(a.map(r=>r.twn)).length};}).sort((a,b)=>b.k.localeCompare(a.k));
+  const cols=fmt=>[{l:'LAN engrs',k:'eng',n:1,f:fmt},{l:'Cars',k:'car',n:1,f:fmt},{l:'Labour',k:'lab',n:1,f:fmt},{l:'Tickets',k:'tkt',n:1,f:fmt},{l:'POI',k:'poi',n:1,f:fmt},{l:'Avg KPI',k:'kpi',n:1,f:f1,c:v=>v>=T?'good':v<T*.7?'bad':'warn'},{l:'Fiber m',k:'fiber',n:1,f:int},{l:'Avg ticket time',k:'td',n:1,f:dur},{l:'Avg POI time',k:'pd',n:1,f:dur},{l:'Within 1 day',k:'r1',n:1,f:v=>v==null?'–':Math.round(v*100)+'%'}];
+  const tf=isAvg?f1:int;
+  return (days.length>1?toggle:`<p class="lede seg-note">${dlabel(last)}${S.twns.length?' · '+S.twns[0]:''}. Pick a Start date earlier than the End date to see an average over several days.</p>`)+h+
+  trendPanel(rows)+
+  
+  panel('Township summary',(isAvg?'Average per day across the filter. ':dlabel(last)+'. ')+'Click a column header to sort.',tbl([{l:'Township',k:'k'},...cols(tf)],byT))+
+  fold('Daily summary','Every day in your filter.',tbl([{l:'Date',k:'k',f:dlabel},...cols(int),{l:'Townships',k:'twn',n:1},{l:'Max dBm',k:'mx',n:1,f:f2},{l:'Min dBm',k:'mn',n:1,f:f2}],byD))+
+  panel('Needs attention',isAvg?'For all days in your filter.':'For '+dlabel(last)+'.',alertList(alerts(cur).filter(a=>a.lvl!=='good')));
+};
+V.summary.after=rows=>{trendChart(rows);const c=C();const days=uniq(rows.map(r=>r.date)).sort();const isAvg=S.sumMode==='avg';
+  const cur=isAvg?rows:rows.filter(r=>r.date===days[days.length-1]);
+  const t=[...groupBy(cur,'twn')].map(([k,a])=>({k,...(isAvg?sAvg(a):sStats(a))})).sort((a,b)=>(b.tkt+b.poi)-(a.tkt+a.poi));
+  const r1=v=>Math.round(v*10)/10;
+  chart('c_twn','bar',t.map(x=>x.k),[{label:'Tickets',data:t.map(x=>r1(x.tkt)),backgroundColor:c.fiber},{label:'POI',data:t.map(x=>r1(x.poi)),backgroundColor:c.amber}],{stacked:1,horizontal:1});
+  const d=[...groupBy(rows,'date')].sort((a,b)=>a[0].localeCompare(b[0]));
+  chart('c_day','bar',d.map(x=>dlabel(x[0])),[{label:'Tickets',data:d.map(x=>x[1].filter(r=>r.type==='TKT').length),backgroundColor:c.fiber},{label:'POI',data:d.map(x=>x[1].filter(r=>r.type==='POI').length),backgroundColor:c.amber}],{stacked:1});};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-summode]');if(!b)return;S.sumMode=b.dataset.summode;render();});
+
+V.kpi=rows=>{const T=+S.settings.target;const ed=engDays(rows).sort((a,b)=>b.kpi-a.kpi||a.eng.localeCompare(b.eng));
+  const gcols=first=>[{l:first,k:'k'},{l:'Engineers',k:'engs',n:1},{l:'Engineer-days',k:'engDays',n:1},{l:'KPI tasks',k:'kpi',n:1},{l:'Avg KPI / engineer',k:'avgKpi',n:1,f:f2,c:v=>v>=T?'good':v<T*.7?'bad':'warn'},{l:'Avg tickets',k:'avgTkt',n:1,f:f2},{l:'Avg POI',k:'avgPoi',n:1,f:f2},{l:'Target achievement',k:'ach',n:1,f:v=>v==null?'–':Math.round(v*100)+'%'},{l:'Hit target',k:'hit',n:1},{l:'Avg task time',k:'avgDur',n:1,f:dur}];
+  return `<p class="lede">KPI = resolved tasks per engineer per day (tickets + POI), excluding tasks marked “No KPI”. Daily target is ${T} tasks; change it under the upload button.</p>
+  <div class="cards">${card(f2(ed.length?sum(ed.map(e=>e.kpi))/ed.length:null),'Average KPI',1)}${card(ed.length,'Engineer-days')}${card(ed.filter(e=>e.kpi>=T).length,'At or above target')}${card(ed.filter(e=>e.kpi<T).length,'Below target')}${card(ed.length?Math.max(...ed.map(e=>e.kpi)):'–','Highest in a day')}</div>`+
+  panel('KPI attention','',alertList(alerts(rows,'kpi')))+
+  skip('Tasks per engineer','All engineers in the selected period. Tickets and POI, highest first.',cv('c_kpi',Math.max(300,uniq(rows.map(r=>r.eng)).length*18+60)))+
+  `<div class="grid2">${fold('Average KPI by SR','',tbl(gcols('SR'),kpiGroup(rows,'sr')))}${panel('Average KPI by township','An engineer working in two townships counts once in each.',tbl(gcols('Township'),kpiGroup(rows,'twn')))}</div>`+
+  panel('Daily KPI detail','One row per engineer per day.',tbl([{l:'Date',k:'date',f:dlabel},{l:'Engineer',k:'eng'},{l:'SR',k:'sr'},{l:'Township',k:'twn'},{l:'Car',k:'car'},{l:'Tickets',k:'tkt',n:1},{l:'POI',k:'poi',n:1},{l:'KPI tasks',k:'kpi',n:1,c:v=>v>=T?'good':v<T*.7?'bad':'warn'},{l:'Target',k:'ach',n:1,f:v=>Math.round(v*100)+'%'},{l:'Avg task time',k:'avgDur',n:1,f:dur},{l:'On-site total',k:'onsite',n:1,f:dur},{l:'First arrival',k:'first',n:1,f:hm},{l:'Last departure',k:'last',n:1,f:hm},{l:'Avg After dBm',k:'db',n:1,f:f2,c:dbClass},{l:'Fiber m',k:'fiber',n:1,f:int}],ed,{h:620}));
+};
+V.kpi.after=rows=>{const c=C();const ed=[...groupBy(rows,'eng')].map(([k,a])=>({k,t:a.filter(r=>r.type==='TKT'&&isKpi(r)).length,p:a.filter(r=>r.type==='POI'&&isKpi(r)).length})).sort((a,b)=>(b.t+b.p)-(a.t+a.p));
+  chart('c_kpi','bar',ed.map(x=>x.k),[{label:'Tickets',data:ed.map(x=>x.t),backgroundColor:c.fiber},{label:'POI',data:ed.map(x=>x.p),backgroundColor:c.amber}],{stacked:1,horizontal:1});};
+
+V.teams=rows=>{const tg=teamGroup(rows,'twn'),sg=teamGroup(rows,'sr'),cg=teamGroup(rows,r=>r.twn+' / '+r.sr);
+  const all=teamGroup(rows,()=>'All')[0]||{};
+  const cols=f=>[{l:f,k:'k'},{l:'LAN engineers',k:'eng',n:1},{l:'Car IDs',k:'car',n:1},{l:'Labour IDs',k:'lab',n:1},{l:'Labour on tasks',k:'labSlots',n:1},{l:'Tasks w/o labour',k:'noLab',n:1},{l:'Tickets',k:'tkt',n:1},{l:'POI',k:'poi',n:1},{l:'Avg car / engineer',k:'carPerEng',n:1,f:f2},{l:'Avg engineer / car',k:'engPerCar',n:1,f:f2,c:v=>v>2?'warn':''},{l:'Labour / engineer',k:'labPerEng',n:1,f:f2}];
+  return `<p class="lede">Township codes: NAY North Okkalapa · TAY Thaketa · TNY Thingangyun · MTY Mingalar Taung Nyunt · TEY Tarmwe · SAY South Okkalapa · DOY Dawbon${rows.some(r=>r.twn==='Others')?' · Others = any other township':''}.<br>Distinct counts of LAN engineers (AK), Car IDs (AN) and contractor / office labour IDs (AP). Labour IDs are split on “/”, so “L-5091/L-4074” counts as 2. Blank values and values starting with “No” (such as “No Cabler”) count as 0.</p>
+  <div class="cards">${card(all.eng||0,'LAN engineers',1)}${card(all.car||0,'Car IDs')}${card(all.lab||0,'Labour IDs')}${card(f2(all.carPerEng),'Avg car per engineer')}${card(f2(all.engPerCar),'Avg engineer per car')}${card(all.labSlots||0,'Labour assigned on tasks')}${card(all.noLab||0,'Tasks with no labour')}</div>`+
+  `<div class="grid2">${panel('Engineers and cars by township','',cv('c_tm',300))}${skip('Engineers and cars by SR','',cv('c_sr',300))}</div>`+
+  panel('Township base','',tbl(cols('Township'),tg))+fold('SR base','',tbl(cols('SR'),sg))+fold('Township × SR','',tbl(cols('Township / SR'),cg));
+};
+V.teams.after=rows=>{const c=C();for(const [id,k] of [['c_tm','twn'],['c_sr','sr']]){const g=teamGroup(rows,k);
+  chart(id,'bar',g.map(x=>x.k),[{label:'Engineers',data:g.map(x=>x.eng),backgroundColor:c.fiber},{label:'Cars',data:g.map(x=>x.car),backgroundColor:c.ink},{label:'Labour',data:g.map(x=>x.lab),backgroundColor:c.amber}]);}};
+
+function boxFinder(rows){const q=(S.boxQ||'').trim();const boxes=uniq(rows.map(r=>r.box)).sort();
+  const opts=boxes.map(b=>`<option value="${esc(b)}">`).join('');
+  let res='';
+  if(q){const ql=q.toLowerCase();const exact=boxes.find(b=>b.toLowerCase()===ql);const hits=exact?[exact]:boxes.filter(b=>b.toLowerCase().includes(ql));
+    if(!hits.length)res=`<p class="note" style="margin-top:10px">No box matches “${esc(q)}” in the selected period.</p>`;
+    else if(hits.length>1)res=`<p class="note" style="margin:10px 0 6px">${hits.length} boxes match. Pick one:</p><div class="chips">${hits.map(b=>`<button class="chip" data-box="${esc(b)}">${esc(b)} <span class="muted">(${rows.filter(r=>r.box===b).length})</span></button>`).join('')}</div>`;
+    else{const B=hits[0],a=rows.filter(r=>r.box===B).sort((x,y)=>y.date.localeCompare(x.date)||(y.arr??0)-(x.arr??0));
+      const T=new Set(S.twns);const ds=uniq(a.map(r=>r.date)).sort();const hist=S.rows.filter(r=>r.date<=ds[ds.length-1]&&r.date>=addDays(ds[0],-30)&&(!T.size||T.has(r.twn)));
+      const rp=repeatPairs(hist).filter(p=>p.box===B&&p.kind!==RK[2]&&ds.includes(p.cDate));
+      const custs=uniq(a.map(r=>r.sid));const dbv=a.map(r=>r.db).filter(x=>x!=null);
+      res=`<div class="boxcard"><div class="rk-top"><b style="font-size:18px">${esc(B)}</b><span class="rk-s">${esc(uniq(a.map(r=>r.twn)).join(', '))} · ${esc(uniq(a.map(r=>r.sr)).join(', '))}</span></div>
+       <div class="cards" style="margin:12px 0">${card(a.length,'Visits',1)}${card(a.filter(r=>r.type==='TKT').length,'Tickets')}${card(a.filter(r=>r.type==='POI').length,'POI')}${card(custs.length,'Customers (unique)')}${card(uniq(a.map(r=>r.eng)).length,'Engineers')}${card(rp.length,'Repeat tickets')}${card(dbv.length?f2(avg(dbv)):'–','Avg After dBm')}${card(dbv.length?f2(Math.min(...dbv)):'–','Weakest dBm')}${card(int(sum(a.map(r=>r.fiber)))+' m','Fiber used')}</div>
+       <div class="grid2" style="margin-bottom:12px"><div><h3 class="sub">Root causes (BA)</h3>${countBy(a,'src').map(([k,n])=>`<span class="pt pt-muted">${esc(k)} · ${n}</span>`).join('')}</div><div><h3 class="sub">Resolutions (BB)</h3>${countBy(a,'res').map(([k,n])=>`<span class="pt pt-muted">${esc(k)} · ${n}</span>`).join('')}</div></div>
+       <h3 class="sub">All visits to this box</h3>${tbl([{l:'Date',k:'date',f:dlabel},{l:'Type',k:'type',f:typeTag},{l:'Customer ID (H)',k:'sid'},{l:'Customer',k:'cust'},{l:'Engineer',k:'eng'},{l:'Arrival',k:'arr',f:hm,n:1},{l:'Duration',k:'dur',f:dur,n:1},{l:'Root cause (BA)',k:'src'},{l:'Resolution (BB)',k:'res'},{l:'After dBm',k:'db',n:1,f:f2,c:dbClass},{l:'Fiber m',k:'fiber',n:1,f:int}],a,{h:420})}</div>`;}}
+  return `<section class="panel"><h2>Find a box</h2><p class="note">Type part or all of a box name (column M). Searches every box in the selected period.</p>
+    <div class="row"><input id="boxQ" class="bigsearch" type="search" list="boxList" placeholder="e.g. CA2-PKNF05ZNAY-B04" value="${esc(q)}" aria-label="Box name"><datalist id="boxList">${opts}</datalist><button class="btn pri" id="boxGo">Search</button>${q?'<button class="btn" id="boxClr">Clear</button>':''}</div>${res}</section>`;}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-box]');if(b){S.boxQ=b.dataset.box;render();return;}
+  if(e.target.id==='boxGo'){S.boxQ=$('#boxQ').value;render();}if(e.target.id==='boxClr'){S.boxQ='';render();}});
+document.addEventListener('keydown',e=>{if(e.target.id==='boxQ'&&e.key==='Enter'){S.boxQ=e.target.value;render();}});
+document.addEventListener('change',e=>{if(e.target.id==='boxQ'&&uniq(S.rows.map(r=>r.box)).includes(e.target.value)){S.boxQ=e.target.value;render();}});
+V.boxes=rows=>boxFinder(rows)+boxesView(rows);
+const boxesView=rows=>{const b=rows.filter(r=>r.box);const byBox=[...groupBy(b,'box')].map(([k,a])=>({k,twn:uniq(a.map(r=>r.twn)).join(', '),sr:uniq(a.map(r=>r.sr)).join(', '),v:a.length,tkt:a.filter(r=>r.type==='TKT').length,poi:a.filter(r=>r.type==='POI').length,engs:uniq(a.map(r=>r.eng)),days:uniq(a.map(r=>r.date)).length,rc:uniq(a.map(r=>r.src)).join(', ')})).sort((x,y)=>y.v-x.v);
+  const bySite=[...groupBy(b,'twn')].map(([k,a])=>({k,boxes:uniq(a.map(r=>r.box)).length,v:a.length,eng:uniq(a.map(r=>r.eng)).length,rep:[...groupBy(a,'box')].filter(x=>x[1].length>1).length,engs:uniq(a.map(r=>r.eng)).join(', ')})).sort((x,y)=>y.boxes-x.boxes);
+  return `<p class="lede">Township is used as the site. Each box shows how many times it was visited and which LAN engineers went there.</p>
+  <div class="cards">${card(uniq(b.map(r=>r.box)).length,'Distinct boxes',1)}${card(b.length,'Box visits')}${card(byBox.filter(x=>x.v>1).length,'Boxes visited 2+ times')}${card(rows.length-b.length,'Tasks with no box name')}</div>`+
+  panel('Box attention','',alertList(alerts(rows,'boxes').concat(byBox.filter(x=>x.v==2).length?[{lvl:'warn',html:`${byBox.filter(x=>x.v==2).length} box(es) were visited twice.`}]:[])))+
+  skip('Boxes per site','',cv('c_bx',280))+
+  panel('Site summary','',tbl([{l:'Site (township)',k:'k'},{l:'Boxes',k:'boxes',n:1},{l:'Visits',k:'v',n:1},{l:'Repeat boxes',k:'rep',n:1,c:v=>v?'warn':''},{l:'Engineers',k:'eng',n:1},{l:'Engineer names',k:'engs',w:1}],bySite))+
+  fold('Box detail','',tbl([{l:'Box name',k:'k'},{l:'Site',k:'twn'},{l:'SR',k:'sr'},{l:'Visits',k:'v',n:1,c:v=>v>=3?'bad':v>1?'warn':''},{l:'Tickets',k:'tkt',n:1},{l:'POI',k:'poi',n:1},{l:'Engineers who went',k:'engs',w:1,f:v=>esc(v.join(', ')),s:r=>r.engs.length},{l:'Service root cause',k:'rc',w:1}],byBox,{h:620}));
+};
+V.boxes.after=rows=>{const c=C();const g=[...groupBy(rows.filter(r=>r.box),'twn')].map(([k,a])=>[k,uniq(a.map(r=>r.box)).length,a.length]).sort((a,b)=>b[1]-a[1]);
+  chart('c_bx','bar',g.map(x=>x[0]),[{label:'Boxes',data:g.map(x=>x[1]),backgroundColor:c.fiber},{label:'Visits',data:g.map(x=>x[2]),backgroundColor:c.muted}]);};
+
+const BK=[['Same day',x=>x===0],['1 day',x=>x===1],['2 days',x=>x===2],['3–7 days',x=>x>=3&&x<=7],['Over 7 days',x=>x>7]];
+V.resolve=rows=>{const w=rows.map(r=>({...r,rd:daysBetween(r.date,r.created)})).filter(r=>r.rd!=null);
+  const tk=w.filter(r=>r.type==='TKT'),po=w.filter(r=>r.type==='POI');
+  const bt=[...groupBy(w,'twn')].map(([k,a])=>({k,n:a.length,avg:avg(a.map(r=>r.rd)),t:avg(a.filter(r=>r.type==='TKT').map(r=>r.rd)),p:avg(a.filter(r=>r.type==='POI').map(r=>r.rd)),max:Math.max(...a.map(r=>r.rd)),same:a.filter(r=>r.rd===0).length,over:a.filter(r=>r.rd>2).length})).sort((a,b)=>b.avg-a.avg);
+  return `<p class="lede">Days from Ticket Create Date (P) to Schedule Date (A), which is treated as the resolve date.</p>
+  <div class="cards">${card(f1(avg(w.map(r=>r.rd)))+' d','Average create → resolve',1)}${card(f1(avg(tk.map(r=>r.rd)))+' d','Tickets average')}${card(f1(avg(po.map(r=>r.rd)))+' d','POI average')}${card(f1(med(w.map(r=>r.rd)))+' d','Median')}${card(pct(w.filter(r=>r.rd===0).length,w.length),'Same day')}${card(w.filter(r=>r.rd>2).length,'Over 2 days')}</div>`+
+  panel('Resolve-time attention','',alertList(alerts(rows,'resolve')))+
+  `<div class="grid2">${panel('Distribution','',cv('c_rs',280))}${skip('Summary by bucket','',tbl([{l:'Bucket',k:'b'},{l:'Tickets',k:'t',n:1},{l:'POI',k:'p',n:1},{l:'Total',k:'n',n:1},{l:'Share',k:'s',n:1}],BK.map(([b,f])=>({b,t:tk.filter(r=>f(r.rd)).length,p:po.filter(r=>f(r.rd)).length,n:w.filter(r=>f(r.rd)).length,s:pct(w.filter(r=>f(r.rd)).length,w.length)}))))}</div>`+
+  panel('By township','',tbl([{l:'Township',k:'k'},{l:'Tasks',k:'n',n:1},{l:'Avg days',k:'avg',n:1,f:f1},{l:'Tickets avg',k:'t',n:1,f:f1},{l:'POI avg',k:'p',n:1,f:f1},{l:'Max days',k:'max',n:1,c:v=>v>7?'bad':v>2?'warn':''},{l:'Same day',k:'same',n:1},{l:'Over 2 days',k:'over',n:1}],bt))+
+  fold('All tasks by days open','Every task in the selected period, oldest first.',tbl([{l:'Customer ID (H)',k:'sid'},{l:'Type',k:'type',f:typeTag},{l:'Created',k:'created',f:dlabel},{l:'Resolved',k:'date',f:dlabel},{l:'Days',k:'rd',n:1,c:v=>v>7?'bad':v>2?'warn':''},{l:'Township',k:'twn'},{l:'Engineer',k:'eng'},{l:'Service root cause',k:'src'}],[...w].sort((a,b)=>b.rd-a.rd),{h:460}));
+};
+V.resolve.after=rows=>{const c=C();const w=rows.map(r=>({...r,rd:daysBetween(r.date,r.created)})).filter(r=>r.rd!=null);
+  chart('c_rs','bar',BK.map(b=>b[0]),[{label:'Tickets',data:BK.map(([,f])=>w.filter(r=>r.type==='TKT'&&f(r.rd)).length),backgroundColor:c.fiber},{label:'POI',data:BK.map(([,f])=>w.filter(r=>r.type==='POI'&&f(r.rd)).length),backgroundColor:c.amber}],{stacked:1});};
+
+V.arrival=rows=>{const ed=engDays(rows).filter(e=>e.first!=null);const L=lateMin();
+  const fa=ed.map(e=>e.first);const single=uniq(rows.map(r=>r.date)).length===1;
+  let gantt='';
+  if(single&&ed.length){const s=[...ed].sort((a,b)=>a.first-b.first);const lo=Math.floor(Math.min(...s.map(e=>isFinite(e.srdep)?Math.min(e.srdep,e.first):e.first))/60)*60,hi=Math.ceil(Math.max(...s.map(e=>e.last||e.first))/60)*60;const span=Math.max(60,hi-lo);const X=m=>((m-lo)/span*100).toFixed(2)+'%';
+    const ticks=[];for(let m=lo;m<=hi;m+=60)ticks.push(`<span style="left:${X(m)}">${hmShort(m)}</span>`);
+    gantt=panel('Shift timeline','Each row is one engineer, sorted by first arrival. Dashed line is SR departure to first site; bars are time on site.',
+      `<div class="legend"><span><i style="background:var(--fiber)"></i>Ticket</span><span><i style="background:var(--amber)"></i>POI</span><span><i style="background:var(--fault);width:2px"></i>Late start line (${hm(lateMin())})</span></div>
+      <div class="gantt"><div class="g-axis"><span>Engineer</span><div class="g-ticks">${ticks.join('')}</div><span style="text-align:right">First</span></div>
+      ${s.map(e=>`<div class="g-row"><div class="g-name" title="${esc(e.eng)}">${esc(e.eng)} <small>${esc(e.twn)}</small></div><div class="g-track">
+       <div style="position:absolute;left:${X(L)};top:0;bottom:0;width:1px;background:var(--fault);opacity:.6"></div>
+       ${isFinite(e.srdep)&&e.srdep<e.first?`<div class="g-travel" style="left:${X(e.srdep)};width:calc(${X(e.first)} - ${X(e.srdep)})"></div>`:''}
+       ${e.rows.filter(r=>r.arr!=null&&r.dep!=null).map(r=>`<div class="g-seg ${r.type}" title="Customer ${esc(r.sid||'–')} ${hm(r.arr)}–${hm(r.dep)}" style="left:${X(r.arr)};width:max(3px,calc(${X(r.dep)} - ${X(r.arr)}))"></div>`).join('')}
+      </div><div class="g-first ${e.first>L?'bad':''}">${hm(e.first)}</div></div>`).join('')}</div>`);}
+  return `<p class="lede">Engineer arrival time (AV). “First arrival” is each engineer's earliest site arrival of the day. Late start threshold is ${hm(lateMin())}.</p>
+  <div class="cards">${card(hm(fa.length?Math.min(...fa):null),'Earliest first arrival',1)}${card(hm(fa.length?Math.max(...fa):null),'Latest first arrival')}${card(hm(avg(fa)),'Average first arrival')}${card(ed.filter(e=>e.first>L).length,'Late starts')}${card(dur(avg(ed.filter(e=>isFinite(e.srdep)&&e.srdep<e.first).map(e=>e.first-e.srdep))),'Avg SR → first site')}${card(hm(Math.max(...rows.map(r=>r.arr).filter(x=>x!=null))),'Last arrival of the day')}</div>`+
+  panel('Arrival attention','',alertList(alerts(rows,'arrival')))+gantt+
+  (single?'':panel('Arrival by hour','',cv('c_ar',260)))+
+  fold('First arrival by engineer','Earliest first.',tbl([{l:'Date',k:'date',f:dlabel},{l:'Engineer',k:'eng'},{l:'Township',k:'twn'},{l:'SR departure',k:'srdep',n:1,f:v=>isFinite(v)?hm(v):'–'},{l:'First arrival',k:'first',n:1,f:hm,c:v=>v>L?'bad':''},{l:'Travel',k:e=>isFinite(e.srdep)&&e.srdep<e.first?e.first-e.srdep:null,n:1,f:dur},{l:'Last departure',k:'last',n:1,f:hm},{l:'Tasks',k:'tasks',n:1}],[...ed].sort((a,b)=>a.first-b.first),{h:560}));
+};
+V.arrival.after=rows=>{if(!document.getElementById('c_ar'))return;const h=[];for(let i=6;i<=21;i++)h.push(i);
+  chart('c_ar','bar',h.map(x=>x+':00'),[{label:'Arrivals',data:h.map(x=>rows.filter(r=>r.arr!=null&&Math.floor(r.arr/60)===x).length),backgroundColor:C().fiber}]);};
+
+const DB=[['<30m',x=>x<30],['30–60m',x=>x>=30&&x<60],['60–90m',x=>x>=60&&x<90],['90–120m',x=>x>=90&&x<120],['>2h',x=>x>=120]];
+V.duration=rows=>{const w=rows.filter(r=>r.dur!=null);const tk=w.filter(r=>r.type==='TKT'),po=w.filter(r=>r.type==='POI');
+  const g=k=>[...groupBy(w,k)].map(([k2,a])=>({k:k2,t:avg(a.filter(r=>r.type==='TKT').map(r=>r.dur)),tn:a.filter(r=>r.type==='TKT').length,p:avg(a.filter(r=>r.type==='POI').map(r=>r.dur)),pn:a.filter(r=>r.type==='POI').length,all:avg(a.map(r=>r.dur)),tot:sum(a.map(r=>r.dur))})).sort((a,b)=>(b.all||0)-(a.all||0));
+  const cols=f=>[{l:f,k:'k'},{l:'Tickets',k:'tn',n:1},{l:'Avg ticket time',k:'t',n:1,f:dur},{l:'POI',k:'pn',n:1},{l:'Avg POI time',k:'p',n:1,f:dur},{l:'Avg overall',k:'all',n:1,f:dur},{l:'Total on site',k:'tot',n:1,f:dur}];
+  return `<p class="lede">Time Duration (AX). Task No containing “TKT” is a ticket; containing “POI” is a POI installation.</p>
+  <div class="cards">${card(dur(avg(tk.map(r=>r.dur))),'Avg ticket solving time',1)}${card(dur(avg(po.map(r=>r.dur))),'Avg POI installation time',1)}${card(dur(med(tk.map(r=>r.dur))),'Median ticket')}${card(dur(med(po.map(r=>r.dur))),'Median POI')}${card(w.filter(r=>r.dur>=120).length,'Tasks over 2h')}${card(dur(sum(w.map(r=>r.dur))),'Total on-site time')}</div>`+
+  panel('Duration attention','',alertList(alerts(rows,'duration')))+
+  `<div class="grid2">${panel('Duration distribution','',cv('c_du',280))}${skip('Average by township','',cv('c_dt',280))}</div>`+
+  panel('By township','',tbl(cols('Township'),g('twn')))+fold('By SR','',tbl(cols('SR'),g('sr')))+fold('By engineer','',tbl(cols('Engineer'),g('eng'),{h:460}))+
+  fold('All tasks by duration','Every task in the selected period, longest first.',tbl([{l:'Customer ID (H)',k:'sid'},{l:'Type',k:'type',f:typeTag},{l:'Date',k:'date',f:dlabel},{l:'Engineer',k:'eng'},{l:'Township',k:'twn'},{l:'Duration',k:'dur',n:1,f:dur,c:v=>v>=120?'bad':''},{l:'Resolution',k:'res'}],[...w].sort((a,b)=>b.dur-a.dur),{h:520}));
+};
+V.duration.after=rows=>{const c=C();const w=rows.filter(r=>r.dur!=null);
+  chart('c_du','bar',DB.map(x=>x[0]),[{label:'Tickets',data:DB.map(([,f])=>w.filter(r=>r.type==='TKT'&&f(r.dur)).length),backgroundColor:c.fiber},{label:'POI',data:DB.map(([,f])=>w.filter(r=>r.type==='POI'&&f(r.dur)).length),backgroundColor:c.amber}]);
+  const t=[...groupBy(w,'twn')];chart('c_dt','bar',t.map(x=>x[0]),[{label:'Ticket (min)',data:t.map(x=>Math.round(avg(x[1].filter(r=>r.type==='TKT').map(r=>r.dur))||0)),backgroundColor:c.fiber},{label:'POI (min)',data:t.map(x=>Math.round(avg(x[1].filter(r=>r.type==='POI').map(r=>r.dur))||0)),backgroundColor:c.amber}],{yt:'minutes'});};
+
+V.root=rows=>{const n=rows.length;const lst=k=>countBy(rows,k).map(([k2,v])=>({k:k2,v,s:pct(v,n)}));
+  const daily=[...groupBy(rows,'date')].map(([d,a])=>{const c=countBy(a,'rcc')[0]||[],s=countBy(a,'src')[0]||[],r=countBy(a,'res')[0]||[];const fd=a.filter(x=>/fiber\s*damage/i.test(x.src)).length;
+    return {d,n:a.length,c:c[0]+' ('+c[1]+')',s:s[0]+' ('+s[1]+')',r:r[0]+' ('+r[1]+')',fd,fdp:pct(fd,a.length),cpe:a.filter(x=>/cpe|onu/i.test(x.rcc)).length};}).sort((a,b)=>b.d.localeCompare(a.d));
+  const combo=[...groupBy(rows,r=>r.rcc+'|'+r.src+'|'+r.res)].map(([k,a])=>{const [c,s,r]=k.split('|');return {c,s,r,v:a.length,twn:uniq(a.map(x=>x.twn)).length};}).sort((a,b)=>b.v-a.v);
+  const c3=[{l:'Item',k:'k',w:1},{l:'Tasks',k:'v',n:1},{l:'Share',k:'s',n:1}];
+  return `<p class="lede">Root Cause Category (AZ), Service Root Cause (BA) and On-site Resolution (BB).</p>
+  <div class="cards">${card(uniq(rows.map(r=>r.rcc)).length,'Root cause categories',1)}${card(pct(rows.filter(r=>/fiber\s*damage/i.test(r.src)).length,n),'Fiber damage share')}${card(rows.filter(r=>/cpe|onu/i.test(r.rcc)).length,'CPE / ONU faults')}${card(rows.filter(r=>r.reopen>=1).length,'Re-opened tickets (count ≥ 1)')}</div>`+
+  panel('Root cause attention','',alertList(alerts(rows,'root')))+
+  `<div class="grid2">${panel('Root cause category','',cv('c_r1',300))}${panel('Service root cause','All causes in the selected period.',cv('c_r2',Math.max(300,uniq(rows.map(r=>r.src)).length*22+60)))}</div>`+
+  panel('On-site resolution','All resolutions in the selected period.',cv('c_r3',Math.max(320,uniq(rows.map(r=>r.res)).length*22+60)))+
+  fold('Daily root-cause summary','Top item of each column for each day.',tbl([{l:'Date',k:'d',f:dlabel},{l:'Tasks',k:'n',n:1},{l:'Top category',k:'c'},{l:'Top service root cause',k:'s'},{l:'Top resolution',k:'r'},{l:'Fiber damage',k:'fd',n:1},{l:'Share',k:'fdp',n:1},{l:'CPE/ONU',k:'cpe',n:1}],daily))+
+  `<div class="grid2">${skip('Categories','',tbl(c3,lst('rcc')))}${skip('Service root causes','',tbl(c3,lst('src')))}</div>`+
+  (rows.some(r=>r.reopen>=1)?skip('Re-opened tickets','Tickets with a re-opening count of 1 or more in the past 30 days (column G). Zero is excluded.',tbl([{l:'Customer ID (H)',k:'sid'},{l:'Customer',k:'cust'},{l:'Re-open count',k:'reopen',n:1,c:v=>v>=2?'bad':'warn'},{l:'Date',k:'date',f:dlabel},{l:'Box',k:'box'},{l:'Township',k:'twn'},{l:'Engineer',k:'eng'},{l:'Service root cause',k:'src'},{l:'Resolution',k:'res'}],rows.filter(r=>r.reopen>=1).sort((a,b)=>b.reopen-a.reopen))):'')+
+  skip('Resolutions','',tbl(c3,lst('res')))+
+  fold('Category → cause → resolution','Which fixes are applied for which faults.',tbl([{l:'Category',k:'c'},{l:'Service root cause',k:'s'},{l:'Resolution',k:'r'},{l:'Tasks',k:'v',n:1},{l:'Townships',k:'twn',n:1}],combo,{h:460}));
+};
+V.root.after=rows=>{const P=PAL();const a=countBy(rows,'rcc');chart('c_r1','pie',a.map(x=>x[0]),[{data:a.map(x=>x[1]),backgroundColor:P}]);
+  const b=countBy(rows,'src');chart('c_r2','bar',b.map(x=>x[0]),[{label:'Tasks',data:b.map(x=>x[1]),backgroundColor:C().fiber}],{horizontal:1});
+  const r=countBy(rows,'res');chart('c_r3','bar',r.map(x=>x[0]),[{label:'Tasks',data:r.map(x=>x[1]),backgroundColor:C().ink}],{horizontal:1});};
+
+V.signal=rows=>{const w=rows.filter(r=>r.db!=null);const d=[...groupBy(w,'date')].map(([k,a])=>{const v=a.map(r=>r.db);const mx=a.reduce((p,r)=>r.db>p.db?r:p),mn=a.reduce((p,r)=>r.db<p.db?r:p);
+    return {k,n:a.length,mx:mx.db,mxT:mx.sid,mn:mn.db,mnT:mn.sid,mnE:mn.eng,avg:avg(v),warn:v.filter(x=>x<-25&&x>=-27).length,bad:v.filter(x=>x<-27).length};}).sort((a,b)=>b.k.localeCompare(a.k));
+  const t=[...groupBy(w,'twn')].map(([k,a])=>{const v=a.map(r=>r.db);return {k,n:a.length,mx:Math.max(...v),mn:Math.min(...v),avg:avg(v),bad:v.filter(x=>x<-25).length};}).sort((a,b)=>a.avg-b.avg);
+  const v=w.map(r=>r.db);
+  return `<p class="lede">After dBm (BJ). Higher (closer to 0) is a stronger signal. Bands used: −25 or better is good, −25 to −27 borderline, below −27 weak.</p>
+  <div class="cards">${card(v.length?f2(Math.max(...v)):'–','Max dBm (strongest)',1)}${card(v.length?f2(Math.min(...v)):'–','Min dBm (weakest)')}${card(f2(avg(v)),'Average')}${card(v.filter(x=>x>=-25).length,'Good')}${card(v.filter(x=>x<-25&&x>=-27).length,'Borderline')}${card(v.filter(x=>x<-27).length,'Weak')}</div>`+
+  panel('Signal attention','',alertList(alerts(rows,'signal')))+
+  `<div class="grid2">${panel('Max and min per day','',cv('c_s1',280))}${panel('Distribution','',cv('c_s2',280))}</div>`+
+  fold('Per day','',tbl([{l:'Date',k:'k',f:dlabel},{l:'Readings',k:'n',n:1},{l:'Max dBm',k:'mx',n:1,f:f2,c:dbClass},{l:'Max customer ID',k:'mxT'},{l:'Min dBm',k:'mn',n:1,f:f2,c:dbClass},{l:'Min customer ID',k:'mnT'},{l:'Min engineer',k:'mnE'},{l:'Avg',k:'avg',n:1,f:f2},{l:'Borderline',k:'warn',n:1},{l:'Weak',k:'bad',n:1}],d))+
+  fold('By township','',tbl([{l:'Township',k:'k'},{l:'Readings',k:'n',n:1},{l:'Max',k:'mx',n:1,f:f2},{l:'Min',k:'mn',n:1,f:f2,c:dbClass},{l:'Avg',k:'avg',n:1,f:f2},{l:'Below −25',k:'bad',n:1,c:v=>v?'warn':''}],t))+
+  fold('All readings, weakest first','Every After dBm reading in the selected period.',tbl([{l:'Customer ID (H)',k:'sid'},{l:'Type',k:'type',f:typeTag},{l:'Engineer',k:'eng'},{l:'Box',k:'box'},{l:'Township',k:'twn'},{l:'After dBm',k:'db',n:1,f:f2,c:dbClass}],[...w].sort((a,b)=>a.db-b.db),{h:520}));
+};
+V.signal.after=rows=>{const c=C();const w=rows.filter(r=>r.db!=null);const d=[...groupBy(w,'date')].sort((a,b)=>a[0].localeCompare(b[0]));
+  chart('c_s1','bar',d.map(x=>dlabel(x[0])),[{label:'Max (strongest)',data:d.map(x=>Math.max(...x[1].map(r=>r.db))),backgroundColor:c.ok,maxBarThickness:36},{label:'Min (weakest)',data:d.map(x=>Math.min(...x[1].map(r=>r.db))),backgroundColor:c.fault,maxBarThickness:36}],{yt:'dBm (shorter bar = stronger signal)'});
+  const lo=Math.floor(Math.min(-28,...w.map(r=>r.db))),hi=Math.ceil(Math.max(-15,...w.map(r=>r.db)));const B=[];for(let i=hi;i>lo;i--)B.push(i);chart('c_s2','bar',B.map(b=>`${b} to ${b-1}`),[{label:'Tasks',data:B.map(b=>w.filter(r=>r.db<=b&&r.db>b-1).length),backgroundColor:B.map(b=>b<=-27?c.fault:b<=-25?c.amber:c.fiber)}]);};
+
+V.cable=rows=>{const n=rows.length;const ct=[...groupBy(rows,'cable')].map(([k,a])=>({k,v:a.length,s:pct(a.length,n),m:sum(a.map(r=>r.fiber)),t:a.filter(r=>r.type==='TKT').length,p:a.filter(r=>r.type==='POI').length})).sort((a,b)=>b.v-a.v);
+  const day=[...groupBy(rows,'date')].map(([k,a])=>{const u=a.filter(r=>r.fiber>0);return {k,m:sum(a.map(r=>r.fiber)),u:u.length,avg:avg(u.map(r=>r.fiber)),t:sum(a.filter(r=>r.type==='TKT').map(r=>r.fiber)),p:sum(a.filter(r=>r.type==='POI').map(r=>r.fiber)),mx:u.length?Math.max(...u.map(r=>r.fiber)):0};}).sort((a,b)=>b.k.localeCompare(a.k));
+  const g=k=>[...groupBy(rows,k)].map(([k2,a])=>({k:k2,m:sum(a.map(r=>r.fiber)),u:a.filter(r=>r.fiber>0).length,avg:avg(a.filter(r=>r.fiber>0).map(r=>r.fiber))})).sort((a,b)=>b.m-a.m);
+  const fm=sum(rows.map(r=>r.fiber));const u=rows.filter(r=>r.fiber>0);
+  const mc=[{l:'',k:'k'},{l:'Fiber m',k:'m',n:1,f:int},{l:'Tasks using fiber',k:'u',n:1},{l:'Avg m per task',k:'avg',n:1,f:f1}];
+  return `<p class="lede">Usage Cable Type (BW) and Fiber Usage Meter (BZ).</p>
+  <div class="cards">${card(int(fm)+' m','Total fiber used',1)}${card(u.length,'Tasks using fiber')}${card(f1(avg(u.map(r=>r.fiber)))+' m','Avg per fiber task')}${card(f1(avg(day.map(d=>d.m)))+' m','Avg per day')}${ct.slice(0,3).map(c=>card(c.v,esc(c.k)+' tasks')).join('')}</div>`+
+  `<div class="grid2">${panel('Cable type usage','',cv('c_c1',280))}${panel('Fiber meters per day','',cv('c_c2',280))}</div>`+
+  panel('Cable type summary','',tbl([{l:'Cable type',k:'k'},{l:'Tasks',k:'v',n:1},{l:'Share',k:'s',n:1},{l:'Tickets',k:'t',n:1},{l:'POI',k:'p',n:1},{l:'Fiber m',k:'m',n:1,f:int}],ct))+
+  fold('Daily fiber usage','',tbl([{l:'Date',k:'k',f:dlabel},{l:'Total m',k:'m',n:1,f:int},{l:'Tickets m',k:'t',n:1,f:int},{l:'POI m',k:'p',n:1,f:int},{l:'Tasks using fiber',k:'u',n:1},{l:'Avg m / task',k:'avg',n:1,f:f1},{l:'Longest run',k:'mx',n:1,f:int}],day))+
+  `<div class="grid2">${fold('By township','',tbl([{...mc[0],l:'Township'},...mc.slice(1)],g('twn')))}${fold('By engineer','',tbl([{...mc[0],l:'Engineer'},...mc.slice(1)],g('eng'),{h:420}))}</div>`;
+};
+V.cable.after=rows=>{const P=PAL();const a=countBy(rows,'cable');chart('c_c1','pie',a.map(x=>x[0]),[{data:a.map(x=>x[1]),backgroundColor:P}]);
+  const d=[...groupBy(rows,'date')].sort((x,y)=>x[0].localeCompare(y[0]));chart('c_c2','bar',d.map(x=>dlabel(x[0])),[{label:'Tickets',data:d.map(x=>sum(x[1].filter(r=>r.type==='TKT').map(r=>r.fiber))),backgroundColor:C().fiber},{label:'POI',data:d.map(x=>sum(x[1].filter(r=>r.type==='POI').map(r=>r.fiber))),backgroundColor:C().amber}],{stacked:1,yt:'meters'});};
+
+// ---------- weekly trend by township ----------
+const TM=[['kpi','Average KPI',a=>{const e=engDays(a);return e.length?sum(e.map(x=>x.kpi))/e.length:null;},f2],
+ ['eng','Engineers',a=>uniq(a.map(r=>r.eng)).length,int],
+ ['tkt','Tickets done',a=>a.filter(r=>r.type==='TKT').length,int],
+ ['poi','POI installs done',a=>a.filter(r=>r.type==='POI').length,int],
+ ['car','Cars on road',a=>uniq(a.map(r=>r.car)).length,int],
+ ['lab','Labour count',a=>labIds(a).length,int],
+ ['r1','Resolved within 1 day (%)',a=>{const d=a.map(r=>daysBetween(r.date,r.created)).filter(x=>x!=null);return d.length?Math.round(d.filter(x=>x<=1).length/d.length*100):null;},v=>v==null?'–':v+'%'],
+ ['fiber','Fiber used (m)',a=>sum(a.map(r=>r.fiber)),int],
+ ['td','Avg ticket time (min)',a=>{const v=avg(a.filter(r=>r.type==='TKT').map(r=>r.dur));return v==null?null:Math.round(v);},dur],
+ ['pd','Avg POI time (min)',a=>{const v=avg(a.filter(r=>r.type==='POI').map(r=>r.dur));return v==null?null:Math.round(v);},dur]];
+// counts are averaged per day when days are combined into a week; KPI, % and times use every task in the week
+const TM_COUNT=new Set(['eng','tkt','poi','car','lab','fiber']);
+function trendBase(){const end=S.to,start=addDays(end,-27);const T=new Set(S.twns);
+  return {end,start,rows:S.rows.filter(r=>r.date>=start&&r.date<=end&&(!T.size||T.has(r.twn)))};}
+function weekVal(m,a){if(!a.length)return null;if(!TM_COUNT.has(m[0]))return m[2](a);const v=[...groupBy(a,'date')].map(([,x])=>m[2](x));return avg(v);}
+function trendData(){const {end,start,rows}=trendBase();const m=TM.find(x=>x[0]===S.trend)||TM[0];
+  const days=uniq(rows.map(r=>r.date)).sort();const byD=groupBy(rows,'date');
+  const weeks=[3,2,1,0].map(i=>{const e=addDays(end,-7*i),s0=addDays(e,-6);return {s:s0,e,label:sd(s0)+' – '+sd(e)};});
+  const inW=(r,w)=>r.date>=w.s&&r.date<=w.e;
+  const twns=[...groupBy(rows,'twn')].sort((a,b)=>(a[0]==='Others')-(b[0]==='Others')||b[1].length-a[1].length).map(x=>x[0]);
+  return {end,start,m,days,weeks,twns,rows,day:d=>{const a=byD.get(d);return a?m[2](a):null;},
+    wk:(t,w)=>weekVal(m,rows.filter(r=>inW(r,w)&&(t==='__all'||r.twn===t)))};}
+const sd=d=>dlabel(d).replace(/ \d{4}$/,'');
+function trendPanel(){const D=trendData();const {m,days,weeks,twns,end,start}=D;const wkMode=S.trendMode==='week';
+  const btns=TM.map(([k,l])=>`<button class="chip" data-trend="${k}" aria-pressed="${S.trend===k}">${l.replace(/ \((min|m|%)\)/,'')}</button>`).join('');
+  const seg=`<div class="seg" role="group" aria-label="Trend view"><button data-tmode="day" aria-pressed="${!wkMode}">Daily · last 4 weeks</button><button data-tmode="week" aria-pressed="${wkMode}">Weekly · 4 weeks combined</button></div>`;
+  const note=wkMode?`4 weeks of 7 days ending ${dlabel(end)}. Townships along the bottom, one bar per week (light = oldest, dark = latest)${TM_COUNT.has(m[0])?'; counts are the average per day in each week':''}.`
+                   :`Every saved day from ${dlabel(start)} to ${dlabel(end)} (${days.length} day${days.length===1?'':'s'} with data)${S.twns.length?' · '+S.twns[0]:' · all townships'}.`;
+  let table;
+  if(wkMode){const cols=[{l:'Township',k:'t'},...weeks.map((w,i)=>({l:w.label,k:'w'+i,n:1,f:m[3],s:r=>r['w'+i]}))];
+    const rs=['__all',...twns].map(t=>{const o={t:t==='__all'?'All townships':t};weeks.forEach((w,i)=>o['w'+i]=D.wk(t,w));return o;});table=tbl(cols,rs,{h:320});}
+  else table=tbl([{l:'Date',k:'d',f:dlabel},{l:m[1],k:'v',n:1,f:m[3]}],days.slice().reverse().map(d=>({d,v:D.day(d)})),{h:320});
+  return `<section class="panel" id="trendP"><h2>Trend</h2><div class="row" style="justify-content:space-between;margin:6px 0 8px">${seg}</div><p class="note">${note} Pick a measure:</p>
+    <div class="chips" role="group" aria-label="Trend measure">${btns}</div>${cv('c_trend',300)}<details class="more" style="margin-top:10px"><summary>Show the numbers</summary>${table}</details></section>`;}
+function trendChart(){const D=trendData();const {m,days,weeks,twns}=D;const c=C();
+  if(S.trendMode==='week'){const g=['__all',...twns];const n=weeks.length,dc=i=>{const a=n>1?i/(n-1):1;return `hsl(186,${Math.round(45+40*a)}%,${Math.round(78-50*a)}%)`;};
+    chart('c_trend','bar',g.map(t=>t==='__all'?'All':t),weeks.map((w,i)=>({label:w.label,data:g.map(t=>{const v=D.wk(t,w);return v==null?null:Math.round(v*100)/100;}),backgroundColor:dc(i),borderRadius:2,maxBarThickness:24})),{yt:m[1]});}
+  else chart('c_trend','bar',days.map(sd),[{label:m[1],data:days.map(d=>D.day(d)),backgroundColor:days.map(d=>d===S.to?c.amber:c.fiber),borderRadius:2,maxBarThickness:30}],{yt:m[1]});}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-tmode]');if(!b)return;S.trendMode=b.dataset.tmode;const el=$('#trendP');if(el){el.outerHTML=trendPanel();trendChart();}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-trend]');if(!b)return;S.trend=b.dataset.trend;
+  const el=$('#trendP');if(el){el.outerHTML=trendPanel();trendChart();}});
+
+// ---------- repeat tickets ----------
+const RP_OPTS=[['30','30 days up to End date (default)'],['1','End date only'],['7','7 days up to End date'],['14','14 days up to End date'],['45','45 days up to End date'],['sel','Start date to End date']];
+const rpEnd=()=>{const f=S.dates.length||S.weeks.length||S.months.length;const t=S.twns.length;return (f?' · ends on your selected day':'')+(t?` · ${t} township${t>1?'s':''}`:'');};
+const rpSelect=id=>`<select id="${id}" class="rp-sync" data-k="rpPeriod">${RP_OPTS.map(([v,l])=>`<option value="${v}" ${S.rpPeriod===v?'selected':''}>${l}</option>`).join('')}</select>`;
+const rkSelect=id=>`<select id="${id}" class="rp-sync" data-k="rpKind"><option value="all">All repeat types</option>${RK.slice(0,2).map(k=>`<option ${S.rpKind===k?'selected':''}>${k}</option>`).join('')}</select>`;
+function repeatWindow(){const T=new Set(S.twns);const base=S.rows.filter(r=>!T.size||T.has(r.twn));const saved=uniq(base.map(r=>r.date)).sort();
+  let from,ref;
+  if(S.rpPeriod==='sel'){const ds=uniq(filtered().map(r=>r.date)).sort();from=ds[0]||saved[0];ref=ds[ds.length-1]||saved[saved.length-1];}
+  // the period ENDS on the latest day picked in the top filters (Months / Weeks / Days); nothing after it is used
+  else{const ds=uniq(filtered().map(r=>r.date)).sort();ref=ds[ds.length-1]||saved[saved.length-1];from=ref?addDays(ref,-(+S.rpPeriod-1)):ref;}
+  if(!ref)return {from,ref,days:[],pairsAll:[],pairs:[],win:[]};
+  const hist=base.filter(r=>r.date<=ref&&r.date>=addDays(from,-30));
+  const pairsRaw=repeatPairs(hist).filter(p=>p.cDate>=from);const pfAll=pairsRaw.filter(p=>p.kind===RK[2]);const pairsAll=pairsRaw.filter(p=>p.kind!==RK[2]);
+  if(S.rpKind===RK[2])S.rpKind='all';const pairs=S.rpKind==='all'?pairsAll:pairsAll.filter(p=>p.kind===S.rpKind);
+  const win=hist.filter(r=>r.date>=from);
+  return {from,ref,days:uniq(win.map(r=>r.date)).sort(),pairsAll,pfAll,pairs,win};}
+function rpMetrics(pairs,win){const tk=win.filter(r=>r.type==='TKT');const rb=uniq(pairs.map(p=>p.box));
+  return {rt:pairs.filter(p=>p.kind===RK[0]).length,tp:pairs.filter(p=>p.kind===RK[1]).length,pf:pairs.filter(p=>p.kind===RK[2]).length,all:pairs.length,
+    cust:uniq(pairs.map(p=>p.sid)).length,rate:tk.length?pairs.filter(p=>p.cType==='TKT').length/tk.length:null,rbox:rb.length,box:uniq(win.map(r=>r.box)).length,
+    sys:win.filter(r=>r.reopen>=1).length,gap:avg(pairs.map(p=>p.gap))};}
+V.repeat=()=>{const W=repeatWindow();const {from,ref,days,pairs,win}=W;
+  const bar=`<div class="rpbar"><label>Period${rpSelect('rpP')}</label>
+   <label>Repeat type${rkSelect('rpK')}</label>
+   <span class="rpinfo">${ref?`${dlabel(from)} to ${dlabel(ref)} · ${days.length} saved day${days.length===1?'':'s'}${rpEnd()}`:'No data'}</span></div>`;
+  if(!ref)return bar;
+  // summary: last 1 day on top, average per day at the bottom
+  const lastDay=days[days.length-1];const L=rpMetrics(pairs.filter(p=>p.cDate===lastDay),win.filter(r=>r.date===lastDay));const P=rpMetrics(pairs,win);const n=days.length||1;
+  const perDay=k=>days.map(d=>rpMetrics(pairs.filter(p=>p.cDate===d),win.filter(r=>r.date===d))[k]);
+  const avgCount=k=>P[k]/n;const avgUniq=k=>avg(perDay(k));
+  const M=[['all','All repeats (tickets only)',int,avgCount,1],['rt','Repeat tickets',int,avgCount],['tp','Ticket after POI install',int,avgCount],
+    ['cust','Customers with repeats (unique)',int,avgUniq],
+    ['rate','Repeat rate of tickets',v=>v==null?'–':Math.round(v*100)+'%',()=>P.rate],['gap','Avg days between visits',v=>v==null?'–':f1(v)+' d',()=>P.gap]];
+  const sumCards=`<div class="rpcards">${M.map(([k,l,f,av,hi])=>`<div class="rpc ${hi?'hi':''}"><span class="rpl">${l}</span><b>${f(L[k])}</b><span class="rpd">Last day · ${dlabel(lastDay).replace(/ \d{4}$/,'')}</span><div class="rpavg"><span>Average${k==='rate'||k==='gap'?' (period)':' per day'}</span><strong>${k==='rate'?f(av()):k==='gap'?f(av()):f1(av(k))}</strong></div></div>`).join('')}</div>`;
+  // who did the visit before the repeat
+  const fixBy=[...groupBy(pairs,'pEng')].map(([k,a])=>{const v=win.filter(r=>r.eng===k).length;const mr=countBy(a,'pRes')[0];
+    return {k,n:a.length,rt:a.filter(x=>x.kind===RK[0]).length,tp:a.filter(x=>x.kind===RK[1]).length,pf:a.filter(x=>x.kind===RK[2]).length,cust:uniq(a.map(x=>x.sid)).length,custList:[...a].sort((x,y)=>x.pDate.localeCompare(y.pDate)).map(x=>`<b>${esc(x.sid)}</b> · ${esc(x.pRes)} <span style="color:var(--muted)">(${esc(dlabel(x.pDate).replace(/ \d{4}$/,''))})</span>`).join('<br>'),visits:v,rate:v?a.length/v:null,mr:mr?mr[0]:'–',mrn:mr?mr[1]:0,gap:avg(a.map(x=>x.gap))};}).sort((a,b)=>b.n-a.n);
+  // customer history with resolution (BB)
+  const T=new Set(S.twns);const sids=uniq(pairs.map(p=>p.sid));
+  const cust=sids.map(k=>{const h=S.rows.filter(r=>r.sid===k&&r.date<=ref&&r.date>=addDays(from,-30)&&(!T.size||T.has(r.twn))).sort((x,y)=>x.date.localeCompare(y.date)||(x.arr??0)-(y.arr??0));
+    return {k,cust:h[0]&&h[0].cust,twn:h[0]&&h[0].twn,box:h.length?h[h.length-1].box:null,n:h.length,kinds:uniq(pairs.filter(p=>p.sid===k).map(p=>p.kind)).join(', '),
+      hist:h.map(r=>`${esc(dlabel(r.date).replace(/ \d{4}$/,''))} · <span class="tag t-${r.type}">${r.type==='TKT'?'Ticket':r.type}</span> · ${esc(r.eng)} · <i>${esc(r.res)}</i>`).join('<br>'),
+      res:uniq(h.map(r=>r.res)).join(', ')};}).sort((a,b)=>b.n-a.n);
+  // POI after first ticket
+  const pf=W.pfAll;
+  // re-opened per system (column G)
+  const sys=win.filter(r=>r.reopen>=1).sort((a,b)=>b.reopen-a.reopen||b.date.localeCompare(a.date));
+  const sysBy=[...groupBy(sys,'eng')].map(([k,a])=>{const mr=countBy(a,'res')[0];return {k,n:a.length,tot:sum(a.map(r=>r.reopen)),cust:uniq(a.map(r=>r.sid)).length,twn:uniq(a.map(r=>r.twn)).join(', '),days:uniq(a.map(r=>r.date)).length,mr:mr?mr[0]+' ('+mr[1]+')':'–'};}).sort((a,b)=>b.n-a.n||b.tot-a.tot);
+  const noSid=win.filter(r=>!r.sid).length;
+  const tagK=v=>`<span class="tag ${v===RK[0]?'t-TKT':v===RK[2]?'t-PF':'t-POI'}">${esc(v)}</span>`;
+  const att=[];
+  if(!pairs.length)att.push({lvl:'good',html:'No repeats found for this period and type.'});
+  if(fixBy[0])att.push({lvl:'bad',html:`<b>${esc(fixBy[0].k)}</b> has the most repeats after their visit: ${fixBy[0].n} (${pct(fixBy[0].n,fixBy[0].visits)} of their ${fixBy[0].visits} visits). Most repeated resolution: <i>${esc(fixBy[0].mr)}</i>.`});
+  if(pf.length)att.push({lvl:'bad',html:`${pf.length} POI task(s) came after the customer's first ticket. The ticket fix may have needed a new install or relocation.`});
+  const fast=pairs.filter(p=>p.gap<=3);if(fast.length)att.push({lvl:'warn',html:`${fast.length} repeat(s) came back within 3 days, so the first fix likely did not hold.`});
+  const mr=countBy(pairs,'pRes')[0];if(mr)att.push({lvl:'warn',html:`Most repeated resolution (column BB) before a repeat: <b>${esc(mr[0])}</b> (${mr[1]}).`});
+  if(noSid)att.push({lvl:'warn',html:`${noSid} task(s) have no Customer ID (column H) and cannot be matched.`});
+  return bar+`<p class="lede">A repeat is a <b>ticket</b> for the same Customer ID (H) within 30 days of an earlier ticket or POI install; POI tasks are not counted. The period ends on the day picked in the top filters.</p>`+
+  panel('Repeat summary',`Big number is the last day (${dlabel(lastDay)}). The average at the bottom covers the ${days.length} saved day${days.length===1?'':'s'} in the period.`,sumCards)+
+  poiAfterTicket(W)+
+  whoSummary(pairs,win)+
+  repeatDetail(W)+
+  custSummary(pairs,from,ref)+
+  fold('Re-opened per system (column G)',`${sys.length} ticket(s) with a re-opening count of 1 or more in the period. Zero is excluded.`,tbl([{l:'Customer ID (H)',k:'sid'},{l:'Customer',k:'cust'},{l:'Re-open count (G)',k:'reopen',n:1,c:v=>v>=2?'bad':'warn'},{l:'Date',k:'date',f:dlabel},{l:'Engineer',k:'eng'},{l:'Township',k:'twn'},{l:'Root cause (BA)',k:'src'},{l:'Resolution (BB)',k:'res'}],sys,{h:520}))+
+  fold('Re-opened per system by engineer',`All ${sysBy.length} engineer(s) with re-opened tickets in the period.`,tbl([{l:'Engineer',k:'k'},{l:'Re-opened tickets',k:'n',n:1},{l:'Total re-open count (G)',k:'tot',n:1},{l:'Customers',k:'cust',n:1},{l:'Days',k:'days',n:1},{l:'Townships',k:'twn',w:1},{l:'Most common resolution (BB)',k:'mr',w:1}],sysBy,{h:0}));
+};
+V.repeat.after=()=>{document.querySelectorAll('.rp-sync').forEach(s=>s.onchange=e=>{S[s.dataset.k]=e.target.value;const y=window.scrollY;const anchor=s.closest('section')&&s.closest('section').id;render();if(anchor){const el=document.getElementById(anchor);if(el)el.scrollIntoView({block:'start'});}else window.scrollTo(0,y);});};
+
+// ---------- smart summary: who did the visit before the repeat ----------
+function whoSummary(pairs,win){
+  if(!pairs.length)return panel('Who did the visit before the repeat','','<p class="note">No repeats in this period.</p>');
+  const visits=win.length,teamRate=visits?pairs.length/visits:0;
+  const rows=[...groupBy(pairs,'pEng')].map(([k,a])=>{const v=win.filter(r=>r.eng===k).length;const rate=v?a.length/v:0;const mr=countBy(a,'pRes')[0]||['–',0];
+    const fast=a.filter(x=>x.gap<=3).length,same=a.filter(x=>x.cRes&&x.pRes&&x.cRes===x.pRes).length;
+    const risk=(rate>=teamRate*1.5&&a.length>=2)?'h':(rate>=teamRate?'m':'l');
+    return {k,n:a.length,v,rate,risk,mr:mr[0],mrn:mr[1],fast,same,minGap:Math.min(...a.map(x=>x.gap)),cust:uniq(a.map(x=>x.sid)).length,twn:countBy(a,'twn')[0][0],
+      list:[...a].sort((x,y)=>x.pDate.localeCompare(y.pDate)),score:a.length*(1+rate)+fast*.5+same*.5};}).sort((a,b)=>b.score-a.score||b.n-a.n);
+  const engN=rows.length,top3=rows.slice(0,3),top3n=sum(top3.map(r=>r.n));
+  // resolutions that do not hold: repeats after this BB resolution ÷ all visits with it
+  const resRows=[...groupBy(pairs,'pRes')].map(([k,a])=>{const used=win.filter(r=>r.res===k).length;return {k,n:a.length,used,rate:used?a.length/used:0,engs:uniq(a.map(x=>x.pEng)).length};})
+    .filter(r=>r.used>0).sort((a,b)=>b.n-a.n||b.rate-a.rate);
+  const worstRes=[...resRows].filter(r=>r.used>=5).sort((a,b)=>b.rate-a.rate||b.n-a.n)[0];
+  const fastAll=pairs.filter(x=>x.gap<=3).length,sameAll=pairs.filter(x=>x.cRes&&x.pRes&&x.cRes===x.pRes).length;
+  const R=v=>Math.round(v*100)+'%';
+  const F=[];
+  F.push({lvl:'bad',html:`<b>${top3.length===1?esc(top3[0].k):top3.map(r=>esc(r.k)).join(', ')}</b> ${top3.length===1?'accounts':'account'} for <b>${top3n} of ${pairs.length}</b> repeats (${R(top3n/pairs.length)}). ${engN} engineer${engN>1?'s':''} had at least one repeat.`});
+  F.push({lvl:'warn',html:`Team repeat rate is <b>${R(teamRate)}</b> of visits. ${rows.filter(r=>r.risk==='h').length} engineer(s) are at 1.5× that or more.`});
+  if(worstRes)F.push({lvl:'warn',html:`Weakest fix (BB): <b>${esc(worstRes.k)}</b> was followed by a repeat ${worstRes.n} of ${worstRes.used} times (${R(worstRes.rate)}).`});
+  if(sameAll)F.push({lvl:'warn',html:`${sameAll} repeat(s) were fixed with the <b>same resolution</b> as the earlier visit, so the root cause may still be there.`});
+  if(fastAll)F.push({lvl:'bad',html:`${fastAll} repeat(s) came back within 3 days.`});
+  const maxRate=Math.max(...rows.map(r=>r.rate),teamRate)||1;
+  const badge=r=>`<span class="risk risk-${r.risk}">${r.risk==='h'?'High':r.risk==='m'?'Watch':'Low'}</span>`;
+  const rank=rows.map((r,i)=>`<li><div class="rk-top"><span class="rk-n">${i+1}</span><b>${esc(r.k)}</b>${badge(r)}<span class="rk-s">${r.n} repeat${r.n>1?'s':''} · ${R(r.rate)} of ${r.v} visits</span></div>
+     <div class="rk-bar"><i style="width:${(r.rate/maxRate*100).toFixed(1)}%"></i><em style="left:${(teamRate/maxRate*100).toFixed(1)}%" title="Team average ${R(teamRate)}"></em></div>
+     <div class="rk-m">Most used fix: <b>${esc(r.mr)}</b> (${r.mrn})${r.fast?` · <span class="bad">${r.fast} within 3 days</span>`:''}${r.same?` · <span class="warn">${r.same} same fix again</span>`:''}</div></li>`).join('');
+  const resT=tbl([{l:'Resolution (BB)',k:'k',w:1},{l:'Repeats after',k:'n',n:1,c:()=>'bad'},{l:'Times used',k:'used',n:1},{l:'Repeat rate',k:'rate',n:1,f:R,c:v=>v>=teamRate*1.5?'bad':v>=teamRate?'warn':''},{l:'Engineers',k:'engs',n:1}],resRows,{h:420});
+  const custCell=r=>`<details class="cl"><summary>${r.cust} customer${r.cust>1?'s':''}</summary>${r.list.map(x=>`<div><b>${esc(x.sid)}</b> · ${esc(x.pRes)} <span class="muted">${esc(dlabel(x.pDate).replace(/ \d{4}$/,''))} → back ${esc(dlabel(x.cDate).replace(/ \d{4}$/,''))} (${x.gap}d)</span></div>`).join('')}</details>`;
+  const table=tbl([{l:'Engineer',k:'k'},{l:'Risk',k:'risk',f:(v,r)=>badge(r),s:r=>({h:3,m:2,l:1})[r.risk]},{l:'Repeats',k:'n',n:1,c:()=>'bad'},{l:'Rate',k:'rate',n:1,f:R},{l:'Visits',k:'v',n:1},
+    {l:'≤ 3 days',k:'fast',n:1,c:v=>v?'bad':''},{l:'Same fix again',k:'same',n:1,c:v=>v?'warn':''},{l:'Most used fix (BB)',k:'mr',w:1,f:(v,r)=>esc(v)+` <span class="muted">(${r.mrn})</span>`},{l:'Main township',k:'twn'},
+    {l:'Customer ID (H) · fix (BB)',k:'list',f:(v,r)=>custCell(r),s:r=>r.cust,c:()=>'wide'}],rows,{h:520});
+  return panel('Who did the visit before the repeat',`Engineers whose visit was followed by a repeat. Risk compares each engineer's repeat rate with the team average of ${R(teamRate)}: <b>High</b> is 1.5× or more (with 2+ repeats), <b>Watch</b> is above average.`,
+    `<div class="who-find">${alertList(F)}</div>
+     <div class="grid2" style="margin:16px 0 0">
+       <div><h3 class="sub">Engineers to follow up <span class="muted" style="font:500 13px var(--sans)">(all ${rows.length})</span></h3><ol class="rk rk-scroll">${rank}</ol><p class="note" style="margin-top:6px">Bar = repeat rate. Line = team average.</p></div>
+       <div><h3 class="sub">Fixes that didn't hold (BB)</h3><p class="note">Repeat rate = repeats after this resolution ÷ times it was used in the period.</p>${resT}</div>
+     </div>
+     <details class="more" style="margin-top:14px"><summary>Show all engineers (table)</summary><p class="note">Tap “customers” to see each Customer ID, the fix used (BB), and when they came back.</p>${table}</details>`);
+}
+
+// ---------- smart summary: customer history ----------
+function custSummary(pairs,from,ref){
+  if(!pairs.length)return panel('Customer history','','<p class="note">No repeat customers in this period.</p>');
+  const T=new Set(S.twns);const sids=uniq(pairs.map(p=>p.sid));const sd=d=>esc(dlabel(d).replace(/ \d{4}$/,''));
+  const C=sids.map(k=>{const h=S.rows.filter(r=>r.sid===k&&r.date<=ref&&r.date>=addDays(from,-30)&&(!T.size||T.has(r.twn))).sort((x,y)=>x.date.localeCompare(y.date)||(x.arr??0)-(y.arr??0));
+    const n=h.length,engs=uniq(h.map(r=>r.eng));let same=0;for(let i=1;i<n;i++)if(h[i].res&&h[i].res===h[i-1].res&&h[i].res!=='Not set')same++;
+    const last=h[n-1]||{};return {k,cust:h[0]&&h[0].cust,twn:h[0]&&h[0].twn,box:last.box,n,h,span:n>1?daysBetween(last.date,h[0].date):0,engs,same,poiFirst:h[0]&&h[0].type==='POI',
+      src:(countBy(h.filter(r=>r.type==='TKT'),'src')[0]||['–'])[0],last:last.date};});
+  const boxCnt=new Map();C.forEach(c=>{if(c.box)boxCnt.set(c.box,(boxCnt.get(c.box)||0)+1);});
+  C.forEach(c=>{c.shared=c.box&&boxCnt.get(c.box)>=2;c.pat=[];
+    if(c.shared)c.pat.push(['bad','Box issue?']);if(c.same)c.pat.push(['warn','Same fix again']);if(c.poiFirst)c.pat.push(['warn','After install']);
+    if(c.n>=2&&c.engs.length===c.n)c.pat.push(['muted','New engineer each time']);
+    c.status=c.n>=3?'h':'m';c.score=c.n*2+c.same+(c.shared?1:0)+(c.span<=7?1:0);});
+  C.sort((a,b)=>b.score-a.score||b.n-a.n||a.span-b.span);
+  const chronic=C.filter(c=>c.n>=3),sharedBoxes=[...groupBy(C.filter(c=>c.shared),'box')].map(([k,a])=>({k,twn:a[0].twn,cust:a.length,visits:sum(a.map(c=>c.n)),engs:uniq(a.flatMap(c=>c.engs)).length,
+    fix:(countBy(a.flatMap(c=>c.h),'res')[0]||['–'])[0],ids:a.map(c=>c.k).join(', ')})).sort((a,b)=>b.cust-a.cust||b.visits-a.visits);
+  const srcTop=countBy(pairs,'cSrc')[0],sameN=C.filter(c=>c.same).length,top=C[0];
+  const F=[];
+  F.push({lvl:chronic.length?'bad':'warn',html:`<b>${C.length}</b> customer(s) had a repeat; <b>${chronic.length}</b> are chronic with 3 or more visits.`});
+  F.push({lvl:'bad',html:`Most visited: <b>${esc(top.k)}</b>${top.cust?' ('+esc(top.cust)+')':''}, ${top.n} visits in ${top.span} day(s), ${top.twn?esc(top.twn):''}.`});
+  if(sharedBoxes.length)F.push({lvl:'bad',html:`${sharedBoxes.length} box(es) have 2 or more repeat customers, so the fault may be at the box, not the customer. Top: <b>${esc(sharedBoxes[0].k)}</b> (${sharedBoxes[0].cust} customers).`});
+  if(srcTop)F.push({lvl:'warn',html:`Most common root cause on the repeat visit (BA): <b>${esc(srcTop[0])}</b> (${srcTop[1]}).`});
+  if(sameN)F.push({lvl:'warn',html:`${sameN} customer(s) got the same fix (BB) again on the next visit.`});
+  const badge=c=>`<span class="risk risk-${c.status}">${c.n>=3?'Chronic':'Repeat'} · ${c.n}</span>`;
+  const pats=c=>c.pat.map(([cl,t])=>`<span class="pt pt-${cl}">${t}</span>`).join('');
+  const timeline=c=>`<div class="ct">${c.h.map((r,i)=>`${i?`<span class="ct-gap">${daysBetween(r.date,c.h[i-1].date)}d →</span>`:''}<div class="ct-step"><div class="ct-d">${sd(r.date)} <span class="tag t-${r.type}">${r.type==='TKT'?'Ticket':r.type}</span></div><div class="ct-f">${esc(r.res)}</div><div class="ct-e">${esc(r.eng)}</div></div>`).join('')}</div>`;
+  const cards=C.map(c=>`<li><div class="rk-top"><b>${esc(c.k)}</b>${badge(c)}<span class="rk-s">${c.cust?esc(c.cust)+' · ':''}${esc(c.twn||'')}</span></div>
+     <div class="rk-m" style="margin:4px 0 8px">Box ${esc(c.box||'–')} · ${c.span} day(s) from first to last visit · root cause: ${esc(c.src)}</div>${timeline(c)}${c.pat.length?`<div style="margin-top:8px">${pats(c)}</div>`:''}</li>`).join('');
+  const boxT=sharedBoxes.length?tbl([{l:'Box',k:'k'},{l:'Township',k:'twn'},{l:'Repeat customers',k:'cust',n:1,c:()=>'bad'},{l:'Visits',k:'visits',n:1},{l:'Engineers',k:'engs',n:1},{l:'Most used fix (BB)',k:'fix',w:1},{l:'Customer IDs',k:'ids',w:1}],sharedBoxes,{h:300}):'<p class="note">No box has more than one repeat customer.</p>';
+  const all=tbl([{l:'Customer ID (H)',k:'k'},{l:'Customer',k:'cust'},{l:'Status',k:'n',f:(v,r)=>badge(r),n:0},{l:'Days first → last',k:'span',n:1},{l:'Engineers',k:'engs',n:1,f:v=>v.length,s:r=>r.engs.length},
+    {l:'Patterns',k:'pat',f:(v,r)=>pats(r)||'<span class="muted">–</span>',s:r=>r.pat.length},{l:'Last visit',k:'last',f:dlabel},{l:'Township',k:'twn'},{l:'Box',k:'box'},
+    {l:'Visit history (fix BB · engineer)',k:'h',f:(v,r)=>`<details class="cl"><summary>${r.n} visits</summary>${r.h.map(x=>`<div>${sd(x.date)} · <span class="tag t-${x.type}">${x.type==='TKT'?'Ticket':x.type}</span> · ${esc(x.res)} <span class="muted">· ${esc(x.eng)}</span></div>`).join('')}</details>`,s:r=>r.n,c:()=>'wide'}],C,{h:520});
+  return panel('Customer history','Customers with a repeat in the period. Chronic means 3 or more visits. Patterns flag a likely cause.',
+    `<div class="who-find">${alertList(F)}</div>
+     <h3 class="sub" style="margin-top:16px">Customers to watch <span class="muted" style="font:500 13px var(--sans)">(all ${C.length}, most urgent first)</span></h3><ol class="rk ctw rk-scroll">${cards}</ol>
+     <details class="more" style="margin-top:14px"><summary>Show boxes with several repeat customers</summary><p class="note">More than one repeat customer on the same box points to a box-side fault.</p>${boxT}</details>
+     <details class="more" style="margin-top:14px"><summary>Show all repeat customers (table)</summary><p class="note">Tap “visits” to see every visit with the fix used (BB) and the engineer.</p>${all}</details>`);
+}
+
+// ---------- repeat detail (own period control, synced with the page) ----------
+function repeatDetail(W){const {from,ref,days,pairs}=W;const rng=ref?`${dlabel(from)} to ${dlabel(ref)} · ${days.length} saved day${days.length===1?'':'s'}${rpEnd()}`:'No data';
+  const byK=k=>pairs.filter(p=>p.kind===k).length;const f3=pairs.filter(p=>p.gap<=3).length;
+  const tagK=v=>`<span class="tag ${v===RK[0]?'t-TKT':v===RK[2]?'t-PF':'t-POI'}">${esc(v)}</span>`;
+  const chips=`<div class="cards" style="margin:12px 0 14px">${card(pairs.length,'Repeat tickets in period',1)}${card(byK(RK[0]),RK[0])}${card(byK(RK[1]),RK[1])}${card(uniq(pairs.map(p=>p.sid)).length,'Customers (unique)')}${card(f1(avg(pairs.map(p=>p.gap)))+' d','Avg days apart')}${card(f3,'Back within 3 days')}</div>`;
+  return `<section class="panel" id="rp-detail"><h2>Repeat detail</h2><p class="note">Each row is the earlier visit and the repeat that followed. The figures and table follow this period and type; changing them here also updates the rest of the page.</p>
+   <div class="rpbar rpbar-in"><label>Period${rpSelect('rpP2')}</label><label>Repeat type${rkSelect('rpK2')}</label><span class="rpinfo">${rng}</span></div>`+
+   tbl([{l:'Customer ID (H)',k:'sid'},{l:'Customer',k:'cust'},{l:'Township',k:'twn'},{l:'Repeat type',k:'kind',f:tagK},
+    {l:'Earlier visit',k:'pDate',f:dlabel},{l:'Done by',k:'pEng',c:()=>'bad'},{l:'Earlier resolution (BB)',k:'pRes'},{l:'Repeat date',k:'cDate',f:dlabel},{l:'Handled visit type',k:'cType',f:v=>v==='TKT'?'Ticket':v},{l:'Days apart',k:'gap',n:1,c:v=>v<=3?'bad':v<=7?'warn':''},{l:'Repeat root cause (BA)',k:'cSrc'},{l:'Repeat resolution (BB)',k:'cRes'},{l:'Box',k:'box'}],pairs,{h:520})+`</section>`;}
+
+// ---------- Repeated – POI after first ticket (key metric) ----------
+function poiAfterTicket(W){const {from,ref,win}=W;const pf=W.pfAll;
+  const poiAll=win.filter(r=>r.type==='POI'),tktCust=uniq(win.filter(r=>r.type==='TKT'&&r.sid).map(r=>r.sid));
+  const share=poiAll.length?pf.length/poiAll.length:null,custN=uniq(pf.map(p=>p.sid)).length;
+  const R=v=>v==null?'–':Math.round(v*100)+'%';const sd=d=>esc(dlabel(d).replace(/ \d{4}$/,''));
+  if(!pf.length)return `<section class="panel key"><h2>Repeated – POI after first ticket <span class="keytag">Key metric</span></h2><p class="note">A POI task for a customer within 30 days after that customer's first ticket. ${ref?dlabel(from)+' to '+dlabel(ref):''}</p><ul class="alerts"><li class="good">No POI after a first ticket in this period.</li></ul></section>`;
+  const TW=new Set(S.twns);const histT=S.rows.filter(r=>r.type==='TKT'&&r.date<=ref&&r.date>=addDays(from,-30)&&(!TW.size||TW.has(r.twn)));
+  const byEng=[...groupBy(pf,'pEng')].map(([k,a])=>{const t=histT.filter(r=>r.eng===k).length;const mr=countBy(a,'pRes')[0]||['–',0];const ms=countBy(a,'pSrc')[0]||['–',0];
+    return {k,n:a.length,t,rate:t?a.length/t:null,mr:mr[0]+' ('+mr[1]+')',ms:ms[0],gap:avg(a.map(x=>x.gap)),fast:a.filter(x=>x.gap<=7).length,ids:[...a].sort((x,y)=>x.pDate.localeCompare(y.pDate))};}).sort((a,b)=>b.n-a.n||(b.rate||0)-(a.rate||0));
+  const byTwn=[...groupBy(pf,'twn')].map(([k,a])=>({k,n:a.length,poi:poiAll.filter(r=>r.twn===k).length,cust:uniq(a.map(x=>x.sid)).length,gap:avg(a.map(x=>x.gap))})).map(o=>({...o,share:o.poi?o.n/o.poi:null})).sort((a,b)=>b.n-a.n);
+  const res=countBy(pf,'pRes'),src=countBy(pf,'pSrc');const fast=pf.filter(p=>p.gap<=7).length;
+  const F=[{lvl:'bad',html:`<b>${pf.length}</b> POI task(s) for <b>${custN}</b> customer(s) came after the customer's first ticket. That is <b>${R(share)}</b> of all ${poiAll.length} POI tasks in the period.`},
+    {lvl:'bad',html:`Most often after a ticket by <b>${esc(byEng[0].k)}</b>: ${byEng[0].n} case(s)${byEng[0].rate!=null?`, ${R(byEng[0].rate)} of their ${byEng[0].t} tickets`:''}.`}];
+  if(res[0])F.push({lvl:'warn',html:`Ticket fix (BB) most often followed by a POI: <b>${esc(res[0][0])}</b> (${res[0][1]}).`});
+  if(src[0])F.push({lvl:'warn',html:`Ticket root cause (BA) most often followed by a POI: <b>${esc(src[0][0])}</b> (${src[0][1]}).`});
+  if(fast)F.push({lvl:'warn',html:`${fast} POI task(s) came within 7 days of the ticket. The ticket visit could have flagged the need for a new install or relocation.`});
+  const ids=r=>`<details class="cl"><summary>${r.n} customer${r.n>1?'s':''}</summary>${r.ids.map(x=>`<div><b>${esc(x.sid)}</b> · ${esc(x.pRes)} <span class="muted">ticket ${sd(x.pDate)} → POI ${sd(x.cDate)} (${x.gap}d)</span></div>`).join('')}</details>`;
+  return `<section class="panel key"><h2>Repeated – POI after first ticket <span class="keytag">Key metric</span></h2>
+   <p class="note">A POI task for a customer within 30 days after that customer's first ticket (matched by Customer ID, column H). Period: ${dlabel(from)} to ${dlabel(ref)}. Follows the Period filter and Township filter, not the Repeat type.</p>
+   <div class="cards" style="margin-bottom:14px">${card(pf.length,'POI after first ticket',1)}${card(custN,'Customers (unique)')}${card(R(share),'Of all POI tasks')}${card(f1(avg(pf.map(p=>p.gap)))+' d','Avg days ticket → POI')}${card(fast,'Within 7 days')}${card(byEng.length,'Engineers involved')}</div>
+   ${alertList(F)}
+   <div class="grid2" style="margin:16px 0 0">
+    <div><h3 class="sub">By engineer who did the first ticket</h3><p class="note">*Tickets in the period plus the 30 days before it, since the first ticket can be earlier than the period.</p>${tbl([{l:'Engineer',k:'k'},{l:'POI after ticket',k:'n',n:1,c:()=>'bad'},{l:'Their tickets*',k:'t',n:1},{l:'Rate',k:'rate',n:1,f:R},{l:'≤ 7 days',k:'fast',n:1},{l:'Most used ticket fix (BB)',k:'mr',w:1},{l:'Customer ID (H) · fix (BB)',k:'ids',f:(v,r)=>ids(r),s:r=>r.n,c:()=>'wide'}],byEng,{h:420})}</div>
+    <div><h3 class="sub">By township</h3>${tbl([{l:'Township',k:'k'},{l:'POI after ticket',k:'n',n:1,c:()=>'bad'},{l:'All POI',k:'poi',n:1},{l:'Share of POI',k:'share',n:1,f:R},{l:'Customers',k:'cust',n:1},{l:'Avg days',k:'gap',n:1,f:f1}],byTwn,{h:420})}</div>
+   </div>
+   <details class="more" style="margin-top:14px"><summary>Show all cases (table)</summary>`+
+   tbl([{l:'Customer ID (H)',k:'sid'},{l:'Customer',k:'cust'},{l:'Township',k:'twn'},{l:'First ticket',k:'pDate',f:dlabel},{l:'Ticket by',k:'pEng',c:()=>'bad'},{l:'Ticket root cause (BA)',k:'pSrc'},{l:'Ticket resolution (BB)',k:'pRes'},{l:'POI date',k:'cDate',f:dlabel},{l:'POI by',k:'cEng'},{l:'Days apart',k:'gap',n:1,c:v=>v<=3?'bad':v<=7?'warn':''},{l:'Box',k:'box'}],pf,{h:420})+`</details></section>`;}
+// ---------- Supabase storage (used when the page is hosted outside Claude) ----------
+function supaDb(url,key){
+  const base=url.replace(/\/+$/,'');const H={apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'};
+  const fail=async r=>{let m='';try{const j=await r.json();m=j.message||j.hint||j.error||'';}catch(e){}
+    const err=new Error(/incorrect password/i.test(m)?'Incorrect password. The server rejected the upload.':(m||('Server error '+r.status)));err.code=r.status===413?'quota_exceeded':'server_'+r.status;throw err;};
+  const rpc=async(fn,body)=>{const r=await fetch(base+'/rest/v1/rpc/'+fn,{method:'POST',headers:H,body:JSON.stringify({p_pass:S.pass||'',...body})});if(!r.ok)await fail(r);};
+  const list=async coll=>{const out=[];for(let from=0;;from+=500){
+      const r=await fetch(base+'/rest/v1/boxops_docs?select=id,data&collection=eq.'+encodeURIComponent(coll)+'&order=id',{headers:{...H,Range:from+'-'+(from+499)}});
+      if(!r.ok)await fail(r);const a=await r.json();out.push(...a);if(a.length<500)break;}
+    return out;};
+  const split=p=>{const i=p.indexOf('/');return [p.slice(0,i),p.slice(i+1)];};
+  return {kind:'supabase',
+    collection:c=>{const q={limit:()=>q,get:async()=>({docs:(await list(c)).map(x=>({id:x.id,data:()=>x.data}))})};return q;},
+    doc:p=>{const [c,id]=split(p);return {
+      get:async()=>{const r=await fetch(base+'/rest/v1/boxops_docs?select=data&collection=eq.'+encodeURIComponent(c)+'&id=eq.'+encodeURIComponent(id),{headers:H});if(!r.ok)await fail(r);const a=await r.json();return {exists:!!a.length,data:()=>a[0]&&a[0].data};},
+      set:data=>rpc('boxops_save',{p_coll:c,p_id:id,p_data:data}),
+      delete:()=>rpc('boxops_delete',{p_coll:c,p_id:id})};}};
+}
+// ---------- PDF report ----------
+const PDF_LIBS=[['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js','https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'],
+  ['https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js','https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js']];
+function loadScript(src){return new Promise((ok,bad)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>bad(new Error('load '+src));document.head.appendChild(s);});}
+async function loadPdfLibs(){if(window.jspdf&&window.jspdf.jsPDF&&window.jspdf.jsPDF.API.autoTable)return;
+  for(const alts of PDF_LIBS){let done=false,err;for(const u of alts){try{await loadScript(u);done=true;break;}catch(e){err=e;}}if(!done)throw new Error('Could not load the PDF tool. Check your internet connection.');}}
+// PDF core fonts only know Latin-1: replace symbols, drop other scripts
+const san=s=>String(s==null?'':s).replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+  .replace(/[–—−]/g,'-').replace(/→/g,'->').replace(/≥/g,'>=').replace(/≤/g,'<=').replace(/·/g,'-').replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/…/g,'...').replace(/×/g,'x').replace(/[^\x20-\x7E\xA0-\xFF]/g,'').replace(/\s+/g,' ').trim();
+
+function reportDialog(){const dates=Object.keys(S.days).sort();if(!dates.length){alert('Upload a daily file first.');return;}
+  const last=dates[dates.length-1],first=dates[0];const fd=uniq(filtered().map(r=>r.date)).sort();
+  const d=$('#rdlg');const secs=[['sum','Summary and key figures'],['att','Needs attention'],['twn','Township summary'],['day','Daily summary'],['kpi','Engineer KPI'],['team','Township & SR resources'],['rep','Repeat tickets and POI after first ticket'],['arr','Arrival'],['root','Root cause and resolution'],['sig','Signal (dBm)'],['cab','Cable and fiber']];
+  d.innerHTML=`<h2>Generate report (PDF)</h2><p>Choose the period and what to include. The PDF downloads to this device.</p>
+   <fieldset class="rf"><legend>Period</legend>
+    <label><input type="radio" name="rp" value="filter" checked> Current Start / End date ${fd.length?`<span class="muted">(${dlabel(fd[0])} - ${dlabel(fd[fd.length-1])}, ${fd.length} day${fd.length>1?'s':''})</span>`:''}</label>
+    <label><input type="radio" name="rp" value="7"> Last 7 days <span class="muted">(up to ${dlabel(last)})</span></label>
+    <label><input type="radio" name="rp" value="30"> Last 30 days <span class="muted">(up to ${dlabel(last)})</span></label>
+    <label><input type="radio" name="rp" value="28"> Last 4 weeks <span class="muted">(up to ${dlabel(last)})</span></label>
+    <label><input type="radio" name="rp" value="all"> All saved days <span class="muted">(${dates.length})</span></label>
+    <label><input type="radio" name="rp" value="range"> Custom range</label>
+    <div class="row rrange"><label>From<input type="date" id="rFrom" min="${first}" max="${last}" value="${addDays(last,-29)<first?first:addDays(last,-29)}"></label><label>To<input type="date" id="rTo" min="${first}" max="${last}" value="${last}"></label></div>
+   </fieldset>
+   <fieldset class="rf"><legend>Townships</legend>
+    <label><input type="radio" name="rt" value="filter" checked> ${S.twns.length?`Current township filter (${S.twns.length})`:'All townships (current filter)'}</label>
+    <label><input type="radio" name="rt" value="all"> All townships</label></fieldset>
+   <fieldset class="rf"><legend>Include</legend><div class="rsec">${secs.map(([k,l])=>`<label><input type="checkbox" name="rs" value="${k}" checked> ${l}</label>`).join('')}</div></fieldset>
+   <div class="msg" id="rmsg" role="alert"></div>
+   <div class="row"><button class="btn pri" id="rGo">Generate PDF</button><button class="btn" onclick="document.getElementById('rdlg').close()">Cancel</button></div>`;
+  d.showModal();
+  d.querySelectorAll('#rFrom,#rTo').forEach(i=>i.onfocus=()=>{d.querySelector('input[name=rp][value=range]').checked=true;});
+  $('#rGo').onclick=async()=>{const m=$('#rmsg');const pv=d.querySelector('input[name=rp]:checked').value;let from,to,label;
+    if(pv==='filter'){if(!fd.length){m.className='msg err';m.textContent='The current filters have no data.';return;}from=fd[0];to=fd[fd.length-1];label='Current filters';}
+    else if(pv==='7'||pv==='30'||pv==='28'){to=last;from=addDays(last,-(+pv-1));label=pv==='28'?'Last 4 weeks':'Last '+pv+' days';}
+    
+    else if(pv==='all'){from=first;to=last;label='All saved days';}
+    else{from=$('#rFrom').value;to=$('#rTo').value;label='Custom range';if(!from||!to||from>to){m.className='msg err';m.textContent='Pick a valid From and To date (From must be on or before To).';return;}}
+    const twAll=d.querySelector('input[name=rt]:checked').value==='all';const tw=twAll?[]:S.twns.slice();
+    const inc=new Set([...d.querySelectorAll('input[name=rs]:checked')].map(x=>x.value));
+    if(!inc.size){m.className='msg err';m.textContent='Tick at least one section.';return;}
+    const onlyDates=pv==='filter'?new Set(fd):null;
+    const rows=S.rows.filter(r=>r.date>=from&&r.date<=to&&(!onlyDates||onlyDates.has(r.date))&&(!tw.length||tw.includes(r.twn)));
+    if(!rows.length){m.className='msg err';m.textContent='No data for '+dlabel(from)+' - '+dlabel(to)+'. Choose another period.';return;}
+    const b=$('#rGo');b.disabled=true;m.className='msg';m.textContent='Building the PDF…';
+    try{await loadPdfLibs();await buildPdf(rows,{from,to,label,tw,inc});m.className='msg ok';m.textContent='Done. The PDF has been downloaded.';}
+    catch(e){console.error(e);m.className='msg err';m.textContent='Could not create the PDF: '+(e.message||e);}
+    b.disabled=false;};
+}
+
+function chartImg(type,labels,datasets,o={}){const cv=document.createElement('canvas');cv.width=1100;cv.height=o.h||420;cv.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(cv);
+  const ink='#16304A',grid='#D2DAE0';
+  const ch=new Chart(cv,{type,data:{labels,datasets},plugins:[{id:'bg',beforeDraw:c=>{const x=c.ctx;x.save();x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.restore();}}],
+    options:{responsive:false,animation:false,devicePixelRatio:2,indexAxis:o.horizontal?'y':'x',plugins:{legend:{display:datasets.length>1,position:'bottom',labels:{color:ink,font:{size:14}}}},
+      scales:{x:{stacked:!!o.stacked,grid:{color:grid},ticks:{color:ink,font:{size:13},autoSkip:!o.horizontal?false:true,maxRotation:50}},y:{stacked:!!o.stacked,grid:{color:grid},ticks:{color:ink,font:{size:13},autoSkip:false},beginAtZero:o.zero!==false}}}});
+  const url=cv.toDataURL('image/png');ch.destroy();cv.remove();return url;}
+
+async function buildPdf(rows,{from,to,label,tw,inc}){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=doc.internal.pageSize.getWidth(),Hh=doc.internal.pageSize.getHeight(),M=12;
+  const TEAL=[13,124,135],INK=[22,48,74],MUT=[91,109,125],RED=[179,57,45],AMB=[184,110,0],GRN=[46,125,79];
+  let y=M;const T=+S.settings.target;const days=uniq(rows.map(r=>r.date)).sort();
+  const need=h=>{if(y+h>Hh-14){doc.addPage();y=M+4;}};
+  const h1=t=>{need(34);doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor(...INK);doc.text(san(t),M,y+6);doc.setDrawColor(...TEAL);doc.setLineWidth(.6);doc.line(M,y+8.5,W-M,y+8.5);y+=13;};
+  const h2=t=>{need(26);doc.setFont('helvetica','bold');doc.setFontSize(11.5);doc.setTextColor(...INK);doc.text(san(t),M,y+4);y+=7;};
+  const para=(t,c=MUT,sz=9.5)=>{doc.setFont('helvetica','normal');doc.setFontSize(sz);doc.setTextColor(...c);const L=doc.splitTextToSize(san(t),W-2*M);need(L.length*4.4+2);doc.text(L,M,y+3.5);y+=L.length*4.4+2;};
+  const table=(head,body,opt={})=>{doc.autoTable({startY:y,head:[head.map(san)],body:body.map(r=>r.map(v=>san(v))),margin:{left:M,right:M,bottom:14},theme:'grid',
+      styles:{font:'helvetica',fontSize:opt.fs||8,cellPadding:1.6,textColor:INK,lineColor:[210,218,224],lineWidth:.15,overflow:'linebreak'},
+      headStyles:{fillColor:TEAL,textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[244,247,249]},columnStyles:opt.cs||{},
+      didParseCell:opt.cell});y=doc.lastAutoTable.finalY+6;};
+  const kv=(items,cols=6)=>{const cw=(W-2*M)/cols,ch=17;const rowsN=Math.ceil(items.length/cols);need(rowsN*ch+3);
+    items.forEach(([v,l,hi],i)=>{const x=M+(i%cols)*cw,yy=y+Math.floor(i/cols)*ch;doc.setDrawColor(210,218,224);doc.setFillColor(255,255,255);doc.roundedRect(x+.8,yy,cw-1.6,ch-2,1.5,1.5,'FD');
+      doc.setFont('helvetica','bold');doc.setFontSize(13.5);doc.setTextColor(...(hi?TEAL:INK));doc.text(san(v),x+3.5,yy+7.5);
+      doc.setFont('helvetica','normal');doc.setFontSize(7.6);doc.setTextColor(...MUT);doc.text(doc.splitTextToSize(san(l),cw-6).slice(0,2),x+3.5,yy+11.5);});y+=rowsN*ch+3;};
+  const img=(url,hmm)=>{need(hmm+2);doc.addImage(url,'PNG',M,y,W-2*M,hmm);y+=hmm+4;};
+  const img2=(a,b,hmm)=>{need(hmm+2);const cw=(W-2*M-6)/2;doc.addImage(a,'PNG',M,y,cw,hmm);doc.addImage(b,'PNG',M+cw+6,y,cw,hmm);y+=hmm+4;};
+  const pc=v=>v==null?'-':Math.round(v*100)+'%';
+  const mult=days.length>1;
+
+  // cover header
+  doc.setFillColor(...INK);doc.rect(0,0,W,30,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(22);doc.text('Box-Ops daily report',M,15);
+  doc.setFont('helvetica','normal');doc.setFontSize(10.5);
+  doc.text(san(`${label}: ${dlabel(from)} to ${dlabel(to)}  |  ${days.length} day${days.length>1?'s':''} with data  |  Townships: ${tw.length?tw.join(', '):'All'}`),M,23);
+  doc.setFontSize(8.5);doc.text(san('Generated '+new Date().toLocaleString()+'  |  '+APP_VERSION),W-M,23,{align:'right'});y=38;
+
+  const P=sStats(rows),A=mult?sAvg(rows):null;
+  if(inc.has('sum')){h1('Summary');
+    kv([[f1(P.kpi),'Average KPI (tasks per engineer-day)',1],[uniq(rows.map(r=>r.eng)).length,'LAN engineers'],[int(P.tkt),'Tickets done'],[int(P.poi),'POI installs done'],[int(P.fiber)+' m','Fiber used'],[P.box,'Unique boxes visited'],
+      [uniq(rows.map(r=>r.car)).length,'Cars on road'],[labIds(rows).length,'Labour count'],[dur(P.td),'Avg ticket duration'],[dur(P.pd),'Avg POI duration'],[pc(P.r1),'Resolved within 1 day'],[pc(P.hit),'Engineer-days at target ('+T+')'],
+      [f2(P.db),'Avg After dBm'],[rows.filter(r=>r.db!=null&&r.db<-25).length,'Weak dBm (< -25)'],[f1(P.rd)+' d','Avg create -> resolve']]);
+    if(A){h2('Average per day ('+days.length+' days)');kv([[f1(A.eng),'Engineers / day'],[f1(A.tkt),'Tickets / day'],[f1(A.poi),'POI / day'],[int(A.fiber)+' m','Fiber / day'],[f1(A.car),'Cars / day'],[f1(A.lab),'Labour / day']]);}
+    const tt=[...groupBy(rows,'twn')].sort((a,b)=>b[1].length-a[1].length);
+    const twImg=chartImg('bar',tt.map(x=>x[0]),[{label:'Tickets',data:tt.map(x=>x[1].filter(r=>r.type==='TKT').length),backgroundColor:'#0D7C87'},{label:'POI',data:tt.map(x=>x[1].filter(r=>r.type==='POI').length),backgroundColor:'#B86E00'}],{stacked:1,horizontal:1,h:560});
+    if(mult){const dd=[...groupBy(rows,'date')].sort((a,b)=>a[0].localeCompare(b[0]));
+      const dImg=chartImg('bar',dd.map(x=>dlabel(x[0]).replace(/ \d{4}$/,'')),[{label:'Tickets',data:dd.map(x=>x[1].filter(r=>r.type==='TKT').length),backgroundColor:'#0D7C87'},{label:'POI',data:dd.map(x=>x[1].filter(r=>r.type==='POI').length),backgroundColor:'#B86E00'}],{stacked:1,h:560});
+      need(64);h2('Tasks per day  |  Tasks by township');img2(dImg,twImg,54);}
+    else{need(64);h2('Tasks by township');doc.addImage(twImg,'PNG',M,y,(W-2*M-6)/2,54);y+=58;}}
+  if(inc.has('att')){h1('Needs attention');const al=alerts(rows).filter(a=>a.lvl!=='good');
+    if(!al.length)para('Nothing needs attention for this period.');
+    al.forEach(a=>{const L=doc.splitTextToSize(san(a.html),W-2*M-8);need(L.length*4.4+4);doc.setFillColor(...(a.lvl==='bad'?RED:AMB));doc.rect(M,y,1.4,L.length*4.4+1.5,'F');
+      doc.setFont('helvetica','normal');doc.setFontSize(9.3);doc.setTextColor(...INK);doc.text(L,M+4,y+3.6);y+=L.length*4.4+3.5;});y+=2;}
+  if(inc.has('twn')){h1('Township summary');const t=[...groupBy(rows,'twn')].map(([k,a])=>{const s=mult?sAvg(a):sStats(a);return [k,s];}).sort((a,b)=>(b[1].tkt+b[1].poi)-(a[1].tkt+a[1].poi));
+    if(mult)para('Counts are averages per day; KPI, times and percentages use every task in the period.');const n=mult?f1:int;
+    table(['Township','Engineers','Cars','Labour','Tickets','POI','Avg KPI','Fiber m','Avg ticket','Avg POI','Within 1 day','Unique boxes','Avg dBm'],
+      t.map(([k,s])=>[k,n(s.eng),n(s.car),n(s.lab),n(s.tkt),n(s.poi),f1(s.kpi),int(s.fiber),dur(s.td),dur(s.pd),pc(s.r1),sStats(rows.filter(r=>r.twn===k)).box,f2(s.db)]));}
+  if(inc.has('day')&&mult){h1('Daily summary');const d=[...groupBy(rows,'date')].sort((a,b)=>a[0].localeCompare(b[0]));
+    table(['Date','Engineers','Cars','Labour','Tickets','POI','Avg KPI','Fiber m','Avg ticket','Avg POI','Within 1 day','Unique boxes','Max dBm','Min dBm'],
+      d.map(([k,a])=>{const s=sStats(a),db=a.map(r=>r.db).filter(x=>x!=null);return [dlabel(k),s.eng,s.car,s.lab,s.tkt,s.poi,f1(s.kpi),int(s.fiber),dur(s.td),dur(s.pd),pc(s.r1),s.box,db.length?f2(Math.max(...db)):'-',db.length?f2(Math.min(...db)):'-'];}));}
+  if(inc.has('kpi')){h1('Engineer KPI');para(`KPI = resolved tasks per engineer per day (tickets + POI), excluding "No KPI". Daily target: ${T} tasks.`);
+    const ed=engDays(rows);const g=[...groupBy(ed,'eng')].map(([k,a])=>({k,d:a.length,tkt:sum(a.map(e=>e.tkt)),poi:sum(a.map(e=>e.poi)),kpi:sum(a.map(e=>e.kpi)),hit:a.filter(e=>e.kpi>=T).length,dur:avg(a.flatMap(e=>e.rows.map(r=>r.dur))),fa:avg(a.map(e=>e.first)),sr:uniq(a.flatMap(e=>e.sr.split(', '))).join(', '),tw:uniq(a.flatMap(e=>e.twn.split(', '))).join(', ')}))
+      .map(o=>({...o,avg:o.kpi/o.d})).sort((a,b)=>b.avg-a.avg||b.kpi-a.kpi);
+    table(['#','Engineer','SR','Township','Days','Tickets','POI','KPI tasks','Avg KPI/day','Days at target','Avg task time','Avg first arrival'],
+      g.map((o,i)=>[i+1,o.k,o.sr,o.tw,o.d,o.tkt,o.poi,o.kpi,f2(o.avg),o.hit+' / '+o.d,dur(o.dur),hm(o.fa)]),{cell:c=>{if(c.section==='body'&&c.column.index===8){const v=parseFloat(c.cell.raw);c.cell.styles.textColor=v>=T?GRN:v<T*.7?RED:AMB;c.cell.styles.fontStyle='bold';}}});
+    h2('Average KPI by township');table(['Township','Engineers','Engineer-days','KPI tasks','Avg KPI / engineer','Target achievement'],kpiGroup(rows,'twn').map(o=>[o.k,o.engs,o.engDays,o.kpi,f2(o.avgKpi),pc(o.ach)]));
+    h2('Average KPI by SR');table(['SR','Engineers','Engineer-days','KPI tasks','Avg KPI / engineer','Target achievement'],kpiGroup(rows,'sr').map(o=>[o.k,o.engs,o.engDays,o.kpi,f2(o.avgKpi),pc(o.ach)]));}
+  if(inc.has('team')){h1('Township & SR resources');const cols=['','LAN engineers','Car IDs','Labour IDs','Tickets','POI','Avg car / engineer','Avg engineer / car'];
+    const m=g=>g.map(o=>[o.k,o.eng,o.car,o.lab,o.tkt,o.poi,f2(o.carPerEng),f2(o.engPerCar)]);
+    table(['Township',...cols.slice(1)],m(teamGroup(rows,'twn')));table(['SR',...cols.slice(1)],m(teamGroup(rows,'sr')));}
+  if(inc.has('rep')){h1('Repeat tickets');
+    const TW=new Set(tw);const hist=S.rows.filter(r=>r.date<=to&&r.date>=addDays(from,-30)&&(!TW.size||TW.has(r.twn)));const DS=new Set(days);
+    const all=repeatPairs(hist).filter(p=>DS.has(p.cDate)&&p.cDate>=from);const pr=all.filter(p=>p.kind!==RK[2]),pf=all.filter(p=>p.kind===RK[2]);
+    const tk=rows.filter(r=>r.type==='TKT').length;
+    para('A repeat is a ticket for the same Customer ID (column H) within 30 days of an earlier ticket or POI install. POI tasks are not counted as repeats.');
+    kv([[pr.length,'Repeat tickets',1],[pr.filter(p=>p.kind===RK[0]).length,'Repeat ticket (after ticket)'],[pr.filter(p=>p.kind===RK[1]).length,'Ticket after POI install'],[uniq(pr.map(p=>p.sid)).length,'Customers with repeats'],[pc(tk?pr.length/tk:null),'Repeat rate of tickets'],[f1(avg(pr.map(p=>p.gap)))+' d','Avg days between visits']]);
+    if(pr.length){h2('Who did the visit before the repeat');const vis=rows;
+      table(['Engineer','Repeats after visit','Visits','Repeat rate','Within 3 days','Most used fix (BB)','Customer IDs (H)'],
+        [...groupBy(pr,'pEng')].map(([k,a])=>{const v=vis.filter(r=>r.eng===k).length;const mr=countBy(a,'pRes')[0];return [k,a.length,v,pc(v?a.length/v:null),a.filter(x=>x.gap<=3).length,mr?mr[0]+' ('+mr[1]+')':'-',uniq(a.map(x=>x.sid)).join(', ')];}).sort((a,b)=>b[1]-a[1]),{cs:{6:{cellWidth:80}}});
+      h2('Repeat detail');table(['Customer ID (H)','Customer','Township','Type','Earlier visit','Done by','Earlier fix (BB)','Repeat date','Days','Repeat root cause (BA)','Repeat fix (BB)'],
+        pr.map(p=>[p.sid,p.cust||'',p.twn,p.kind,dlabel(p.pDate),p.pEng,p.pRes,dlabel(p.cDate),p.gap,p.cSrc,p.cRes]),{fs:7.2});}
+    h1('Repeated - POI after first ticket (key metric)');const poiN=rows.filter(r=>r.type==='POI').length;
+    kv([[pf.length,'POI after first ticket',1],[uniq(pf.map(p=>p.sid)).length,'Customers'],[pc(poiN?pf.length/poiN:null),'Of all POI tasks'],[f1(avg(pf.map(p=>p.gap)))+' d','Avg days ticket -> POI'],[pf.filter(p=>p.gap<=7).length,'Within 7 days'],[uniq(pf.map(p=>p.pEng)).length,'Engineers involved']]);
+    if(pf.length)table(['Customer ID (H)','Customer','Township','First ticket','Ticket by','Ticket root cause (BA)','Ticket fix (BB)','POI date','POI by','Days'],pf.map(p=>[p.sid,p.cust||'',p.twn,dlabel(p.pDate),p.pEng,p.pSrc,p.pRes,dlabel(p.cDate),p.cEng,p.gap]),{fs:7.4});
+    else para('No POI after a first ticket in this period.');}
+  if(inc.has('arr')){h1('Arrival');const ed=engDays(rows).filter(e=>e.first!=null);const L=lateMin();
+    const g=[...groupBy(ed,'eng')].map(([k,a])=>({k,d:a.length,fa:avg(a.map(e=>e.first)),e:Math.min(...a.map(e=>e.first)),l:Math.max(...a.map(e=>e.first)),late:a.filter(e=>e.first>L).length})).sort((a,b)=>a.fa-b.fa);
+    para(`First arrival = each engineer's earliest site arrival of the day (column AV). Late start = after ${hm(L)}.`);
+    table(['Engineer','Days','Avg first arrival','Earliest','Latest','Late starts'],g.map(o=>[o.k,o.d,hm(o.fa),hm(o.e),hm(o.l),o.late]),{cell:c=>{if(c.section==='body'&&c.column.index===5&&+c.cell.raw>0)c.cell.styles.textColor=RED;}});}
+  if(inc.has('root')){h1('Root cause and resolution');const n=rows.length;const L=k=>countBy(rows,k).map(([a,b])=>[a,b,pc(b/n)]);
+    h2('Root cause category (AZ)');table(['Category','Tasks','Share'],L('rcc'));h2('Service root cause (BA)');table(['Service root cause','Tasks','Share'],L('src'));h2('On-site resolution (BB)');table(['Resolution','Tasks','Share'],L('res'));}
+  if(inc.has('sig')){h1('Signal (After dBm)');const w=rows.filter(r=>r.db!=null);
+    table(['Date','Readings','Max dBm','Min dBm','Avg','Borderline (-25 to -27)','Weak (< -27)'],[...groupBy(w,'date')].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,a])=>{const v=a.map(r=>r.db);return [dlabel(k),v.length,f2(Math.max(...v)),f2(Math.min(...v)),f2(avg(v)),v.filter(x=>x<-25&&x>=-27).length,v.filter(x=>x<-27).length];}));
+    const weak=[...w].filter(r=>r.db<-25).sort((a,b)=>a.db-b.db);if(weak.length){h2('Readings below -25 dBm');table(['Customer ID (H)','Date','Engineer','Box','Township','After dBm'],weak.map(r=>[r.sid||'-',dlabel(r.date),r.eng,r.box||'-',r.twn,f2(r.db)]));}}
+  if(inc.has('cab')){h1('Cable and fiber');const n=rows.length;
+    table(['Cable type (BW)','Tasks','Share','Fiber m'],[...groupBy(rows,'cable')].map(([k,a])=>[k,a.length,pc(a.length/n),int(sum(a.map(r=>r.fiber)))]).sort((a,b)=>b[1]-a[1]));
+    table(['Date','Total fiber m','Tickets m','POI m','Tasks using fiber','Avg m / task'],[...groupBy(rows,'date')].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,a])=>{const u=a.filter(r=>r.fiber>0);return [dlabel(k),int(sum(a.map(r=>r.fiber))),int(sum(a.filter(r=>r.type==='TKT').map(r=>r.fiber))),int(sum(a.filter(r=>r.type==='POI').map(r=>r.fiber))),u.length,f1(avg(u.map(r=>r.fiber)))];}));}
+  // footer on every page
+  const pages=doc.getNumberOfPages();for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(...MUT);
+    doc.text(san(`Box-Ops daily report ${APP_VERSION}  |  ${dlabel(from)} - ${dlabel(to)}`),M,Hh-6);doc.text(`Page ${i} of ${pages}`,W-M,Hh-6,{align:'right'});}
+  doc.save(`Box-Ops daily report ${from} to ${to}.pdf`);
+  return doc;
+}
+document.addEventListener('click',e=>{if(e.target.closest('#repBtn'))reportDialog();});
+// ---------- render ----------
+function render(){
+  for(const k in charts){charts[k].destroy();delete charts[k];}for(const k in TABLES)delete TABLES[k];
+  $('#nav').innerHTML=VIEWS.map(([k,l])=>`<li><button data-v="${k}" aria-current="${S.view===k}">${l}</button></li>`).join('');
+  const dates=Object.keys(S.days).sort().reverse();
+  const mode=S.db?(S.db.kind==='supabase'?'Shared online storage':'Shared storage'):'Saved in this browser only';
+  $('#dayinfo').innerHTML=(dates.length?`${dates.length} day${dates.length>1?'s':''} saved<br>Latest: ${dlabel(dates[0])}`:'No days saved yet')+`<br><span style="opacity:.7">${mode}</span>`+(S.loadErr?`<div class="loaderr" role="alert">Could not load shared data: ${esc(S.loadErr)}. Showing this browser's copy.</div>`:'');
+  if(!S.rows.length){$('#main').innerHTML=`<div class="empty"><h2>Upload your first daily file</h2><p>Use <b>Upload daily file</b> in the menu. Each file is saved by its Schedule Date, so every upload adds a day to the history.</p><button class="btn pri" onclick="openDlg()">Upload daily file</button></div>`;return;}
+  // period = Start date .. End date (default: the latest day); township = one or all
+  const asc=dates.slice().reverse(),first=asc[0],latest=asc[asc.length-1];
+  if(!S.to||S.to>latest||S.to<first)S.to=latest;if(!S.from||S.from>S.to)S.from=S.to;if(S.from<first)S.from=first;
+  S.months=[];S.weeks=[];const inR=asc.filter(d=>d>=S.from&&d<=S.to);S.dates=inR.length?inR:['__none__'];
+  const twns=uniq(S.rows.filter(r=>r.date>=S.from&&r.date<=S.to).map(r=>r.twn)).sort((a,b)=>(a==='Others')-(b==='Others')||a.localeCompare(b));
+  if(S.twn!=='all'&&!twns.includes(S.twn))S.twn='all';S.twns=S.twn==='all'?[]:[S.twn];
+  const rows=filtered();const title=VIEWS.find(v=>v[0]===S.view)[1];
+  $('#main').innerHTML=`<div class="bar"><h1>${title}</h1>
+    <div class="fbar" role="group" aria-label="Period and township">
+      <button class="nav-d" id="fPrev" title="Previous" aria-label="Previous period" ${S.from<=first?'disabled':''}>‹</button>
+      <label>Start date<input type="date" id="fFrom" min="${first}" max="${latest}" value="${S.from}"></label>
+      <label>End date<input type="date" id="fTo" min="${first}" max="${latest}" value="${S.to}"></label>
+      <button class="nav-d" id="fNext" title="Next" aria-label="Next period" ${S.to>=latest?'disabled':''}>›</button>
+      <div class="qk" role="group" aria-label="Quick period">${[['1','1 day'],['7','7 days'],['28','4 weeks']].map(([n,l])=>`<button data-qk="${n}" aria-pressed="${daysBetween(S.to,S.from)+1==n}">${l}</button>`).join('')}</div>
+      <label>Township<select id="fTwnS"><option value="all">All townships</option>${twns.map(t=>`<option value="${t}" ${S.twn===t?'selected':''}>${t}${TWN_FULL[t]&&t!=='Others'?' · '+TWN_FULL[t]:''}</option>`).join('')}</select></label>
+    </div>
+    <button class="btn pri repbtn" id="repBtn" title="Generate a PDF report for a period"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>Generate report</button></div>
+    <div id="view">${V[S.view](rows)}</div>`;
+  wireBar(asc);
+  if(!inR.length)$('#view').innerHTML=`<div class="empty" style="margin:6vh auto"><h2>No data for ${S.from===S.to?dlabel(S.from):dlabel(S.from)+' – '+dlabel(S.to)}</h2><p>No file was uploaded for this ${S.from===S.to?'day':'period'}. Pick another date, or use ‹ › to move to a day with data.</p></div>`;
+  requestAnimationFrame(()=>V[S.view].after&&V[S.view].after(rows));
+}
+$('#nav').addEventListener('click',e=>{const b=e.target.closest('button[data-v]');if(!b)return;S.view=b.dataset.v;render();window.scrollTo(0,0);});
+if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>render());
+
+// ---------- storage ----------
+const CHUNK=400;const KEEP=45;
+function localGet(){try{return JSON.parse(localStorage.getItem(LS)||'null');}catch(e){return null;}}
+function localPut(){try{localStorage.setItem(LS,JSON.stringify({days:S.days,rows:S.rows.map(r=>BOX_F.map(k=>r[k])),settings:S.settings}));}catch(e){}}
+const toObj=a=>{const o={};BOX_F.forEach((k,i)=>o[k]=a[i]);o.twn=twnCode(o.twn);return o;};
+async function loadAll(){
+  if(S.db){
+    try{const [ds,cs,st]=await Promise.all([S.db.collection('days').limit(1000).get(),S.db.collection('chunks').limit(1000).get(),S.db.doc('config/settings').get()]);
+      if(st.exists)Object.assign(S.settings,st.data());
+      const days={};ds.docs.forEach(d=>days[d.id]=d.data());const rows=[];
+      const byId={};cs.docs.forEach(c=>byId[c.id]=c.data());
+      for(const d of Object.keys(days).sort()){for(let i=0;i<(days[d].chunks||0);i++){const c=byId[d+'_'+i];if(c&&c.rows)c.rows.forEach(a=>rows.push(toObj(a)));}}
+      S.days=days;S.rows=rows;return;
+    }catch(e){console.warn('db load failed',e);S.loadErr=e.message||String(e);}
+  }
+  const l=localGet();if(l){S.days=l.days||{};S.rows=(l.rows||[]).map(toObj);Object.assign(S.settings,l.settings||{});}
+}
+async function saveDay(date,rows,fileName){
+  const arr=rows.map(r=>BOX_F.map(k=>r[k]));const n=Math.ceil(arr.length/CHUNK);const old=S.days[date];
+  const meta={date,count:rows.length,chunks:n,fileName,uploadedAt:new Date().toISOString(),tkt:rows.filter(r=>r.type==='TKT').length,poi:rows.filter(r=>r.type==='POI').length};
+  if(S.db){for(let i=0;i<n;i++)await S.db.doc('chunks/'+date+'_'+i).set({date,i,rows:arr.slice(i*CHUNK,(i+1)*CHUNK)});
+    if(old)for(let i=n;i<(old.chunks||0);i++)await S.db.doc('chunks/'+date+'_'+i).delete();
+    await S.db.doc('days/'+date).set(meta);}
+  S.days[date]=meta;S.rows=S.rows.filter(r=>r.date!==date).concat(rows);localPut();
+}
+async function deleteDay(date){const m=S.days[date];if(S.db&&m){for(let i=0;i<(m.chunks||0);i++)await S.db.doc('chunks/'+date+'_'+i).delete();await S.db.doc('days/'+date).delete();}
+  delete S.days[date];S.rows=S.rows.filter(r=>r.date!==date);localPut();}
+async function saveSettings(){if(S.db)await S.db.doc('config/settings').set({...S.settings});localPut();}
+
+// ---------- PIN + upload dialog ----------
+async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('boxops:'+s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+const dlg=$('#dlg');
+function pinBoxes(id){return `<div class="pin" id="${id}">${[0,1,2,3].map(i=>`<input inputmode="numeric" maxlength="1" pattern="[0-9]" aria-label="PIN digit ${i+1}" autocomplete="off">`).join('')}</div>`;}
+function wirePin(id,done){const ins=[...document.querySelectorAll('#'+id+' input')];ins[0].focus();
+  ins.forEach((el,i)=>{el.oninput=()=>{el.value=el.value.replace(/\D/g,'').slice(-1);if(el.value&&i<3)ins[i+1].focus();const v=ins.map(x=>x.value).join('');if(v.length===4)done(v,ins);};
+    el.onkeydown=e=>{if(e.key==='Backspace'&&!el.value&&i>0){ins[i-1].focus();ins[i-1].value='';}};});}
+const PASS_HASH='47c67131a9c0a2087d70b71891cc306830bd24d98f396fab6c3db4e208256ea5';
+function openDlg(){
+  if(S.unlocked&&S.pass)return showManage();
+  dlg.innerHTML=`<h2>Enter upload password</h2><p>Uploading and deleting days is locked.</p>
+   <form id="pf" novalidate><label class="pw"><span>Password</span><input id="pw" type="password" autocomplete="current-password" aria-describedby="pm" required></label>
+   <div class="msg" id="pm" role="alert"></div>
+   <div class="row"><button class="btn pri" type="submit">Unlock</button><button class="btn" type="button" onclick="dlg.close()">Cancel</button></div></form>`;
+  dlg.showModal();const inp=$('#pw'),pm=$('#pm');inp.focus();
+  inp.oninput=()=>{inp.classList.remove('bad-in');pm.textContent='';};
+  $('#pf').onsubmit=async e=>{e.preventDefault();const v=inp.value;
+    if(!v){pm.className='msg err';pm.textContent='Please enter the password.';inp.classList.add('bad-in');inp.focus();return;}
+    if(await sha(v)===PASS_HASH){S.unlocked=true;S.pass=v;showManage();}
+    else{pm.className='msg err';pm.textContent='Incorrect password. Please try again.';inp.classList.remove('bad-in');void inp.offsetWidth;inp.classList.add('bad-in');inp.select();}};
+}
+function showManage(msg,cls){const dates=Object.keys(S.days).sort().reverse();
+  dlg.innerHTML=`<h2>Daily files</h2><p>Upload the day's Excel file. Rows are grouped by Schedule Date; a day that already exists is replaced. The portal keeps the latest 45 days and removes older days automatically.</p>
+   <div class="row"><button class="btn pri" id="pick">Choose Excel file</button><button class="btn" onclick="dlg.close()">Done</button></div>
+   <div class="msg ${cls||''}" id="um">${msg||''}</div>
+   ${dates.length?`<ul class="daylist">${dates.map(d=>`<li><span>${dlabel(d)} <small style="color:var(--muted)">${S.days[d].count} tasks</small></span><button class="btn danger" data-del="${d}">Delete</button></li>`).join('')}</ul>`:''}
+   <hr><div class="set"><label>Daily KPI target (tasks)<input id="sT" type="number" min="1" value="${S.settings.target}"></label><label>Late start after<input id="sL" type="time" value="${S.settings.late}"></label></div>
+   <div class="row"><button class="btn" id="sv">Save settings</button></div>`;
+  if(!dlg.open)dlg.showModal();{const m=$('#um');if(m&&cls==='err')m.setAttribute('role','alert');}
+  $('#pick').onclick=()=>$('#file').click();
+  $('#sv').onclick=async()=>{S.settings.target=Math.max(1,+$('#sT').value||4);S.settings.late=$('#sL').value||'10:00';try{await saveSettings();showManage('Settings saved.','ok');}catch(e){showManage('Could not save settings: '+(e.message||e.code),'err');}render();};
+  dlg.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(b.dataset.c!=='1'){b.dataset.c='1';b.textContent='Confirm delete';return;}
+    try{await deleteDay(b.dataset.del);showManage(dlabel(b.dataset.del)+' deleted.','ok');}catch(e){showManage('Delete failed: '+(e.message||e.code),'err');}render();});
+}
+$('#fab').onclick=openDlg;
+$('#file').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(!files.length)return;
+  const um=()=>$('#um');um().className='msg';um().textContent='Reading '+files.map(f=>f.name).join(', ')+'…';
+  try{let saved=[];for(const f of files){if(!/\.(xlsx|xlsm|xls|csv)$/i.test(f.name))throw new Error('“'+f.name+'” is not an Excel file. Please choose the .xlsx daily file.');let wb;try{wb=XLSX.read(await f.arrayBuffer(),{type:'array'});}catch(x){throw new Error('“'+f.name+'” could not be opened. The file may be damaged or password-protected.');}const rows=parseWorkbook(XLSX,wb);
+      if(!rows.length)throw new Error('“'+f.name+'” is not a Box-Ops daily report file. No rows with Task No and Schedule Date were found.');
+      for(const [d,a] of groupBy(rows,'date')){um().textContent='Saving '+dlabel(d)+' ('+a.length+' tasks)…';await saveDay(d,a,f.name);saved.push(dlabel(d)+' ('+a.length+')');}}
+    const keepFrom=addDays(Object.keys(S.days).sort().pop(),-(KEEP-1));const old=Object.keys(S.days).filter(d=>d<keepFrom);
+    for(const d of old){um().textContent='Removing '+dlabel(d)+' (older than '+KEEP+' days)…';await deleteDay(d);}
+    if(old.length)saved.push('removed '+old.length+' day(s) older than '+KEEP+' days');
+    const last=Object.keys(S.days).sort().pop();S.from=last;S.to=last;S.twn='all';render();showManage('Saved '+saved.join(', ')+'.','ok');}
+  catch(err){console.error(err);showManage(err.code==='quota_exceeded'?'Storage is full. Delete old days, then upload again.':('Upload failed. '+(err.message||'Could not save to the portal ('+err.code+'). Check your connection and try again.')),'err');}};
+
+// ---------- boot ----------
+document.title='Box-Ops daily report '+APP_VERSION;['verNo','verBrand'].forEach(i=>{const e=document.getElementById(i);if(e)e.textContent=APP_VERSION;});
+(async()=>{
+  const l=localGet();if(l){S.days=l.days||{};S.rows=(l.rows||[]).map(toObj);Object.assign(S.settings,l.settings||{});}
+  let db=null;
+  if(SUPABASE_URL&&SUPABASE_ANON_KEY)db=supaDb(SUPABASE_URL,SUPABASE_ANON_KEY);
+  else{try{db=window.claude&&window.claude.use?await window.claude.use('db'):null;}catch(e){}}
+  S.db=db;await loadAll();render();
+})();
+
+// ---------- filter bar wiring ----------
+function wireBar(asc){const len=()=>daysBetween(S.to,S.from)+1;
+  const set=(f,t)=>{if(f>t)[f,t]=[t,f];S.from=f;S.to=t;render();};
+  $('#fFrom').onchange=e=>{if(e.target.value)set(e.target.value,S.to<e.target.value?e.target.value:S.to);};
+  $('#fTo').onchange=e=>{if(e.target.value)set(S.from>e.target.value?e.target.value:S.from,e.target.value);};
+  $('#fTwnS').onchange=e=>{S.twn=e.target.value;render();};
+  document.querySelectorAll('[data-qk]').forEach(b=>b.onclick=()=>{const n=+b.dataset.qk;set(addDays(S.to,-(n-1)),S.to);});
+  // one day: jump to the previous / next day that has data; a range: shift by its length
+  $('#fPrev').onclick=()=>{if(S.from===S.to){const p=asc.filter(d=>d<S.from).pop();if(p)set(p,p);}else{const n=len();set(addDays(S.from,-n),addDays(S.to,-n));}};
+  $('#fNext').onclick=()=>{if(S.from===S.to){const p=asc.find(d=>d>S.to);if(p)set(p,p);}else{const n=len();set(addDays(S.from,n),addDays(S.to,n));}};}
+// ---------- multi-select filter (not used in the bar any more) ----------
+function multi(id,label,opts,sel,allTxt){const s=new Set(sel);
+  const txt=!sel.length?allTxt:sel.length===1?(opts.find(o=>o[0]===sel[0])||[,sel[0]])[1]:sel.length+' '+label.toLowerCase()+' selected';
+  return `<div class="ms" id="${id}"><span class="ms-l">${label}</span><button type="button" class="ms-b" aria-haspopup="true" aria-expanded="false">${esc(txt)}</button>
+  <div class="ms-p" hidden><div class="ms-a"><button type="button" data-all>Select all</button><button type="button" data-none>Clear</button></div>
+  <div class="ms-list">${opts.map(([v,l])=>`<label><input type="checkbox" value="${esc(v)}" ${s.has(v)?'checked':''}> ${esc(l)}</label>`).join('')}</div>
+  <div class="ms-f"><button type="button" class="btn pri" data-apply>Apply</button></div></div></div>`;}
+function wireMulti(id,key){const w=document.getElementById(id);const b=w.querySelector('.ms-b'),p=w.querySelector('.ms-p');const cbs=[...p.querySelectorAll('input')];
+  const open=o=>{p.hidden=!o;b.setAttribute('aria-expanded',o);};
+  b.onclick=e=>{e.stopPropagation();document.querySelectorAll('.ms-p').forEach(x=>{if(x!==p)x.hidden=true;});open(p.hidden);};
+  p.onclick=e=>e.stopPropagation();
+  p.querySelector('[data-all]').onclick=()=>cbs.forEach(c=>c.checked=true);
+  p.querySelector('[data-none]').onclick=()=>cbs.forEach(c=>c.checked=false);
+  p.querySelector('[data-apply]').onclick=()=>{const v=cbs.filter(c=>c.checked).map(c=>c.value);S[key]=v.length===cbs.length?[]:v;render();};}
+document.addEventListener('click',()=>document.querySelectorAll('.ms-p').forEach(p=>{if(!p.hidden){p.hidden=true;p.previousElementSibling.setAttribute('aria-expanded','false');}}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.ms-p').forEach(p=>p.hidden=true);});
+
+</script>
+</body>
+</html>
