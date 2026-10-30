@@ -1302,7 +1302,8 @@ const tdFindRefresh=()=>{const el=$('#tdFind');if(el){el.outerHTML=tdFinder();}}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-tdq]');if(b){S.tdQ=b.dataset.tdq;tdFindRefresh();return;}
   if(e.target.closest('#tdGo')){S.tdQ=$('#tdQ').value;tdFindRefresh();}
   if(e.target.closest('#tdClr')){S.tdQ='';tdFindRefresh();}
-  if(e.target.closest('#tUp')){$('#tfile').click();}
+  if(e.target.closest('#tUp')){openDlg(()=>$('#tfile').click());}
+  if(e.target.closest('#tClr')&&S.db&&!(S.unlocked&&S.pass)){openDlg(()=>{const b=$('#tClr');if(b)b.click();});return;}
   if(e.target.closest('#tClr')){const b2=e.target.closest('#tClr');if(b2.dataset.c!=='1'){b2.dataset.c='1';b2.textContent='Confirm clear';return;}const d=S.planDate;deletePlan(d).finally(()=>{const k=Object.keys(S.plans||{}).sort();S.planDate=k[k.length-1]||null;S.plan=S.planDate?S.plans[S.planDate]:null;render();});}
   const pb=e.target.closest('[data-plan]');if(pb){S.planDate=pb.dataset.plan;S.plan=S.plans[S.planDate];render();}
   if(e.target.closest('#tRef')){const b3=e.target.closest('#tRef');b3.disabled=true;b3.textContent='Refreshing…';loadTodayPlan().finally(render);}});
@@ -1583,8 +1584,9 @@ function wirePin(id,done){const ins=[...document.querySelectorAll('#'+id+' input
   ins.forEach((el,i)=>{el.oninput=()=>{el.value=el.value.replace(/\D/g,'').slice(-1);if(el.value&&i<3)ins[i+1].focus();const v=ins.map(x=>x.value).join('');if(v.length===4)done(v,ins);};
     el.onkeydown=e=>{if(e.key==='Backspace'&&!el.value&&i>0){ins[i-1].focus();ins[i-1].value='';}};});}
 const PASS_HASH='47c67131a9c0a2087d70b71891cc306830bd24d98f396fab6c3db4e208256ea5';
-function openDlg(){
-  if(S.unlocked&&S.pass)return showManage();
+function openDlg(after){
+  if(typeof after!=='function')after=null;
+  if(S.unlocked&&S.pass)return after?after():showManage();
   dlg.innerHTML=`<h2>Enter upload password</h2><p>Uploading and deleting days is locked.</p>
    <form id="pf" novalidate><label class="pw"><span>Password</span><input id="pw" type="password" autocomplete="current-password" aria-describedby="pm" required></label>
    <div class="msg" id="pm" role="alert"></div>
@@ -1593,7 +1595,7 @@ function openDlg(){
   inp.oninput=()=>{inp.classList.remove('bad-in');pm.textContent='';};
   $('#pf').onsubmit=async e=>{e.preventDefault();const v=inp.value;
     if(!v){pm.className='msg err';pm.textContent='Please enter the password.';inp.classList.add('bad-in');inp.focus();return;}
-    if(await sha(v)===PASS_HASH){S.unlocked=true;S.pass=v;showManage();}
+    if(await sha(v)===PASS_HASH){S.unlocked=true;S.pass=v;if(after){dlg.close();after();}else showManage();}
     else{pm.className='msg err';pm.textContent='Incorrect password. Please try again.';inp.classList.remove('bad-in');void inp.offsetWidth;inp.classList.add('bad-in');inp.select();}};
 }
 function showManage(msg,cls){const dates=Object.keys(S.days).sort().reverse();
