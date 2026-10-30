@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Box-Ops daily report v22</title>
+<title>Box-Ops daily report v24</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -283,8 +283,17 @@ const SUPABASE_ANON_KEY = 'sb_publishable_OLHjd18Q8zjcOgr-wPMjWA_w0f0huZf';
 // =====================================================================
 // ---------- version record ----------
 // Every update: add a new entry at the TOP of CHANGELOG and change APP_VERSION.
-const APP_VERSION='v22';
+const APP_VERSION='v24';
 const CHANGELOG=[
+ {v:'v24',date:'2026-10-29',title:'Repeated Tickets: region and township %',items:[
+  'The Repeat tickets page is renamed Repeated Tickets.',
+  'New section Repeated % by region and township: Regional level (Region, column AR) and Township level, with repeat tickets ÷ tickets and repeated customers ÷ customers, for the selected period and Repeat type.',
+  'Region (column AR) is now saved with every daily upload; days uploaded before v24 show Not set until they are uploaded again.']},
+ {v:'v23',date:'2026-10-29',title:'Plans kept 2 days; repeated % by township and region',items:[
+  'Repeated Local Service IDs shows Repeated % at Regional level (Region, column AR) and Township level: repeated customers ÷ customers in today\'s plan.',
+  'Today counts: times = visits in the last 90 days + tasks in today\'s plan (2 in history + 1 today = 3). Chronic = 3 or more times including today.',
+  'Planning sheets are kept for the 2 latest plan dates and shared online, so everyone sees them. Buttons switch between the saved plans; Refresh loads plans uploaded by others; Delete this plan removes one.',
+  'The Excel export adds Region repeated % and Township repeated % sheets.']},
  {v:'v22',date:'2026-10-29',title:'Today Planning: repeated ID list and export',items:[
   'For Today Planning keeps Summary, Needs attention, Customers to watch and Find history.',
   'Removed: Repeated tracking, Root cause tracking, Engineer tracking, Boxes and sites, All tasks today.',
@@ -399,11 +408,11 @@ document.addEventListener('click',e=>{if(e.target.closest('#verBtn'))showVersion
 const TWN_CODE={northokkalapa:'NAY',thaketa:'TAY',thingangyun:'TNY',mingalartaungnyunt:'MTY',tarmwe:'TEY',southokkalapa:'SAY',dawbon:'DOY'};
 const TWN_FULL={NAY:'North Okkalapa',TAY:'Thaketa',TNY:'Thingangyun',MTY:'Mingalar Taung Nyunt',TEY:'Tarmwe',SAY:'South Okkalapa',DOY:'Dawbon',Others:'Any other township'};
 const twnCode=v=>{const k=String(v==null?'':v).toLowerCase().replace(/[^a-z]/g,'');if(TWN_CODE[k])return TWN_CODE[k];const u=String(v||'').trim().toUpperCase();return TWN_FULL[u]&&u!=='OTHERS'?u:'Others';};
-const BOX_F=['date','task','type','box','created','twn','sr','eng','car','lab','srdep','arr','dep','dur','rcc','src','res','res2','status','db','cable','fiber','reopen','sid','cust'];
+const BOX_F=['date','task','type','box','created','twn','sr','eng','car','lab','srdep','arr','dep','dur','rcc','src','res','res2','status','db','cable','fiber','reopen','sid','cust','region'];
 function parseWorkbook(XLSX, wb, opts){opts=opts||{};
   const norm=s=>String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,'');
   const L=l=>{let n=0;for(const c of l)n=n*26+(c.charCodeAt(0)-64);return n-1;};
-  const want={date:['scheduledate','A'],task:['taskno','C'],box:['boxname','M'],created:['ticketcreatedate','P'],twn:['township','T'],sr:['srname','AI'],eng:['lanengineername','AK'],car:['carid','AN'],lab:['contractorofficelabourid','AP'],srdep:['srdeparturetime','AO'],arr:['engrarrivaltime','AV'],dep:['engrdeparturetime','AW'],dur:['timeduration','AX'],rcc:['rootcausecategory','AZ'],src:['servicerootcause','BA'],res:['onsiteresolution','BB'],res2:['onsiteresolution2','BC'],status:['taskstatus','BD'],db:['afterdbm','BJ'],cable:['usagecabletype','BW'],fiber:['fiberusagemeter','BZ'],reopen:['reopeningcounts','G'],sid:['localserviceid','H'],cust:['customername','Q'],prob:['ticketproblem','L']};
+  const want={date:['scheduledate','A'],task:['taskno','C'],box:['boxname','M'],created:['ticketcreatedate','P'],twn:['township','T'],sr:['srname','AI'],eng:['lanengineername','AK'],car:['carid','AN'],lab:['contractorofficelabourid','AP'],srdep:['srdeparturetime','AO'],arr:['engrarrivaltime','AV'],dep:['engrdeparturetime','AW'],dur:['timeduration','AX'],rcc:['rootcausecategory','AZ'],src:['servicerootcause','BA'],res:['onsiteresolution','BB'],res2:['onsiteresolution2','BC'],status:['taskstatus','BD'],db:['afterdbm','BJ'],cable:['usagecabletype','BW'],fiber:['fiberusagemeter','BZ'],reopen:['reopeningcounts','G'],sid:['localserviceid','H'],cust:['customername','Q'],prob:['ticketproblem','L'],region:['region','AR']};
   const pad=n=>String(n).padStart(2,'0');
   const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
   const toDate=v=>{
@@ -441,7 +450,7 @@ function parseWorkbook(XLSX, wb, opts){opts=opts||{};
         twn:twnCode(str(g('twn'))),sr:str(g('sr'))||'Unknown',eng:str(g('eng'))||'Unassigned',car:str(g('car')),lab:str(g('lab')),
         srdep:toMin(g('srdep')),arr:toMin(g('arr')),dep:toMin(g('dep')),dur:toMin(g('dur'),true),
         rcc:str(g('rcc'))||'Not set',src:str(g('src'))||'Not set',res:str(g('res'))||'Not set',res2:str(g('res2')),
-        status:str(g('status'))||'',db:num(g('db')),cable:str(g('cable'))||'Not set',fiber:num(g('fiber'))||0,reopen:num(g('reopen'))||0,sid:str(g('sid')),cust:str(g('cust')),prob:str(g('prob'))});
+        status:str(g('status'))||'',db:num(g('db')),cable:str(g('cable'))||'Not set',fiber:num(g('fiber'))||0,reopen:num(g('reopen'))||0,sid:str(g('sid')),cust:str(g('cust')),prob:str(g('prob')),region:str(g('region'))});
     }
   }
   return out;
@@ -451,7 +460,7 @@ function parseWorkbook(XLSX, wb, opts){opts=opts||{};
 const S={rows:[],days:{},settings:{target:4,late:'10:00',pinHash:null},view:'summary',dates:[],twns:[],months:[],weeks:[],rpPeriod:'30',rpKind:'all',trend:'kpi',trendMode:'day',from:null,to:null,twn:'all',sumMode:'last',db:null,unlocked:false};
 const charts={};const TABLES={};let tid=0;
 const LS='boxops-v1';
-const VIEWS=[['today','For Today Planning'],['summary','Summary'],['kpi','Engineer KPI'],['teams','Township & SR'],['boxes','Boxes & sites'],['resolve','Resolve time'],['arrival','Arrival'],['duration','Duration'],['root','Root cause'],['repeat','Repeat tickets'],['cable','Cable & fiber']];
+const VIEWS=[['today','For Today Planning'],['summary','Summary'],['kpi','Engineer KPI'],['teams','Township & SR'],['boxes','Boxes & sites'],['resolve','Resolve time'],['arrival','Arrival'],['duration','Duration'],['root','Root cause'],['repeat','Repeated Tickets'],['cable','Cable & fiber']];
 
 // ---------- helpers ----------
 const $=s=>document.querySelector(s);
@@ -617,8 +626,8 @@ function alerts(rows,which){
   if(!which||which==='root'){const c=countBy(rows,'rcc'),s=countBy(rows,'src');
     if(c[0])add(c[0][1]/rows.length>.4?'warn':'good',`Main root cause category is <b>${esc(c[0][0])}</b>: ${c[0][1]} tasks (${pct(c[0][1],rows.length)}).`);
     if(s[0])add('warn',`Most frequent service root cause: <b>${esc(s[0][0])}</b> (${s[0][1]} tasks).`);
-    const ro=rows.filter(r=>r.reopen>=1);if(ro.length){const top=[...ro].sort((a,b)=>b.reopen-a.reopen);add('bad',`${ro.length} ticket(s) re-opened in the past 30 days (re-open count 1 or more; ${int(sum(ro.map(r=>r.reopen)))} re-opens in total). Highest: customer <b>${esc(top[0].sid||'–')}</b> with ${top[0].reopen}. See Re-opened per system on Repeat tickets.`);}}
-  if(!which||which==='repeat'){const ds=uniq(rows.map(r=>r.date)).sort(),DS=new Set(ds),TW=new Set(rows.map(r=>r.twn));const hist=ds.length?S.rows.filter(r=>r.date<=ds[ds.length-1]&&r.date>=addDays(ds[0],-30)&&TW.has(r.twn)):[];const rpAll=repeatPairs(hist).filter(p=>DS.has(p.cDate));const rp=rpAll.filter(x=>x.kind!==RK[2]);const pf=rpAll.filter(x=>x.kind===RK[2]).length;if(rp.length){const top=countBy(rp,'pEng')[0];add('bad',`${rp.length} repeat ticket(s) from ${uniq(rp.map(r=>r.sid)).length} customer(s) within 30 days. Most repeats after <b>${esc(top[0])}</b>'s visits (${top[1]}). See Repeat tickets.`);}if(pf)add('bad',`<b>Repeated – POI after first ticket:</b> ${pf} POI task(s) came within 30 days of the customer's first ticket. See Repeat tickets.`);}
+    const ro=rows.filter(r=>r.reopen>=1);if(ro.length){const top=[...ro].sort((a,b)=>b.reopen-a.reopen);add('bad',`${ro.length} ticket(s) re-opened in the past 30 days (re-open count 1 or more; ${int(sum(ro.map(r=>r.reopen)))} re-opens in total). Highest: customer <b>${esc(top[0].sid||'–')}</b> with ${top[0].reopen}. See Re-opened per system on Repeated Tickets.`);}}
+  if(!which||which==='repeat'){const ds=uniq(rows.map(r=>r.date)).sort(),DS=new Set(ds),TW=new Set(rows.map(r=>r.twn));const hist=ds.length?S.rows.filter(r=>r.date<=ds[ds.length-1]&&r.date>=addDays(ds[0],-30)&&TW.has(r.twn)):[];const rpAll=repeatPairs(hist).filter(p=>DS.has(p.cDate));const rp=rpAll.filter(x=>x.kind!==RK[2]);const pf=rpAll.filter(x=>x.kind===RK[2]).length;if(rp.length){const top=countBy(rp,'pEng')[0];add('bad',`${rp.length} repeat ticket(s) from ${uniq(rp.map(r=>r.sid)).length} customer(s) within 30 days. Most repeats after <b>${esc(top[0])}</b>'s visits (${top[1]}). See Repeated Tickets.`);}if(pf)add('bad',`<b>Repeated – POI after first ticket:</b> ${pf} POI task(s) came within 30 days of the customer's first ticket. See Repeated Tickets.`);}
   if(!which||which==='boxes'){const rep=countBy(rows.filter(r=>r.box),'box').filter(x=>x[1]>=3);if(rep.length)add('bad',`Box <b>${esc(rep[0][0])}</b> was visited ${rep[0][1]} times${rep.length>1?`; ${rep.length} boxes have 3+ visits`:''}. Possible box-side fault.`);}
   if(which==='signal'){const b=rows.filter(r=>r.db!=null&&r.db<-27),w=rows.filter(r=>r.db!=null&&r.db<-25&&r.db>=-27),miss=rows.filter(r=>r.db==null);
     if(b.length)add('bad',`${b.length} task(s) closed with After dBm below −27 (weak signal). Worst: customer <b>${esc([...b].sort((x,y)=>x.db-y.db)[0].sid||'–')}</b> at ${f2(Math.min(...b.map(r=>r.db)))} dBm.`);
@@ -993,7 +1002,7 @@ V.repeat=()=>{const W=repeatWindow();const {from,ref,days,pairs,win}=W;
   const mr=countBy(pairs,'pRes')[0];if(mr)att.push({lvl:'warn',html:`Most repeated resolution (column BB) before a repeat: <b>${esc(mr[0])}</b> (${mr[1]}).`});
   if(noSid)att.push({lvl:'warn',html:`${noSid} task(s) have no Customer ID (column H) and cannot be matched.`});
   return bar+`<p class="lede">A repeat is a <b>ticket</b> for the same Customer ID (H) within 30 days of an earlier ticket or POI install; POI tasks are not counted. The period ends on the day picked in the top filters.</p>`+
-  panel('Repeat summary',`For the period ${from===ref?dlabel(ref):dlabel(from)+' – '+dlabel(ref)} (${days.length} saved day${days.length===1?'':'s'}): <b>Last day</b> is ${dlabel(lastDay)}, <b>Average / day</b> divides by the saved days, <b>Total</b> adds up the whole period (customers are counted once). Rate and days between visits are shown for the whole period.`,sumCards)+
+  panel('Repeat summary',`For the period ${from===ref?dlabel(ref):dlabel(from)+' – '+dlabel(ref)} (${days.length} saved day${days.length===1?'':'s'}): <b>Last day</b> is ${dlabel(lastDay)}, <b>Average / day</b> divides by the saved days, <b>Total</b> adds up the whole period (customers are counted once). Rate and days between visits are shown for the whole period.`,sumCards)+rpLevels(W)+
   poiAfterTicket(W)+
   whoSummary(pairs,win)+
   repeatDetail(W)+
@@ -1122,15 +1131,23 @@ function poiAfterTicket(W){const {from,ref,win}=W;const pf=W.pfAll;
    tbl([{l:'Customer ID (H)',k:'sid'},{l:'Customer',k:'cust'},{l:'Township',k:'twn'},{l:'First ticket',k:'pDate',f:dlabel},{l:'Ticket by',k:'pEng',c:()=>'bad'},{l:'Ticket root cause (BA)',k:'pSrc'},{l:'Ticket resolution (BB)',k:'pRes'},{l:'POI date',k:'cDate',f:dlabel},{l:'POI by',k:'cEng'},{l:'Days apart',k:'gap',n:1,c:v=>v<=3?'bad':v<=7?'warn':''},{l:'Box',k:'box'}],pf,{h:420})+`</details></section>`;}
 // ---------- For Today Planning ----------
 // today's plan file is kept apart from the daily history; it is compared with the 90 days of history before the plan date
-const TODAY_F=[...BOX_F,'prob'];const LS_T='boxops-today';
-function todayLocalGet(){try{return JSON.parse(localStorage.getItem(LS_T)||'null');}catch(e){return null;}}
-async function saveTodayPlan(){const P=S.plan;const doc=P?{date:P.date,fileName:P.fileName,uploadedAt:P.uploadedAt,fields:TODAY_F,rows:P.rows.map(r=>TODAY_F.map(k=>r[k]??null))}:null;
-  try{if(doc)localStorage.setItem(LS_T,JSON.stringify(doc));else localStorage.removeItem(LS_T);}catch(e){}
-  if(S.db){if(!doc){try{await S.db.doc('config/today').delete();}catch(e){}return;}
-    if(JSON.stringify(doc).length>240000)throw new Error('This plan is too large to share online (over about 1,000 tasks). It is kept in this browser only.');
-    await S.db.doc('config/today').set(doc);}}
+const TODAY_F=[...BOX_F,'prob','region'];const LS_T='boxops-plans';const KEEP_PLANS=2;
+// plans are kept per plan date (the 2 latest), stored online as config/plan_YYYY-MM-DD so everyone sees them
+const planDoc=P=>({date:P.date,fileName:P.fileName,uploadedAt:P.uploadedAt,fields:TODAY_F,rows:P.rows.map(r=>TODAY_F.map(k=>r[k]??null))});
 function todayFromDoc(d){if(!d||!d.rows)return null;const F=d.fields||TODAY_F;return {date:d.date,fileName:d.fileName,uploadedAt:d.uploadedAt,rows:d.rows.map(a=>{const o={};F.forEach((k,i)=>o[k]=a[i]);o.twn=twnCode(o.twn);return o;})};}
-async function loadTodayPlan(){let d=null;if(S.db){try{const x=await S.db.doc('config/today').get();if(x.exists)d=x.data();}catch(e){}}if(!d)d=todayLocalGet();S.plan=todayFromDoc(d);}
+function plansLocalGet(){try{return JSON.parse(localStorage.getItem(LS_T)||'null')||{};}catch(e){return {};}}
+function plansLocalPut(){try{const o={};for(const [d,P] of Object.entries(S.plans||{}))o[d]=planDoc(P);localStorage.setItem(LS_T,JSON.stringify(o));}catch(e){}}
+async function savePlan(P){S.plans=S.plans||{};S.plans[P.date]=P;const keep=Object.keys(S.plans).sort().slice(-KEEP_PLANS);const drop=Object.keys(S.plans).filter(d=>!keep.includes(d));
+  drop.forEach(d=>delete S.plans[d]);plansLocalPut();
+  if(S.db){const doc=planDoc(P);if(JSON.stringify(doc).length>240000)throw new Error('This plan is too large to share online (over about 1,000 tasks). It is kept in this browser only.');
+    await S.db.doc('config/plan_'+P.date).set(doc);for(const d of drop){try{await S.db.doc('config/plan_'+d).delete();}catch(e){}}}}
+async function deletePlan(date){if(S.plans)delete S.plans[date];plansLocalPut();if(S.db){try{await S.db.doc('config/plan_'+date).delete();}catch(e){}}}
+async function loadTodayPlan(){let plans={};
+  if(S.db){try{const c=await S.db.collection('config').limit(50).get();c.docs.forEach(d=>{if(d.id.startsWith('plan_')){const P=todayFromDoc(d.data());if(P)plans[P.date]=P;}});
+      if(!Object.keys(plans).length){const x=await S.db.doc('config/today').get();if(x.exists){const P=todayFromDoc(x.data());if(P)plans[P.date]=P;}}}catch(e){console.warn('plans',e);}}
+  if(!Object.keys(plans).length){const l=plansLocalGet();for(const d of Object.values(l)){const P=todayFromDoc(d);if(P)plans[P.date]=P;}}
+  const keep=Object.keys(plans).sort().slice(-KEEP_PLANS);S.plans={};keep.forEach(d=>S.plans[d]=plans[d]);
+  const pick=S.planDate&&S.plans[S.planDate]?S.planDate:keep[keep.length-1];S.planDate=pick||null;S.plan=pick?S.plans[pick]:null;}
 const todayISO=()=>{const t=new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');};
 
 // history in the 90 days before the plan date, indexed by customer and by box
@@ -1147,21 +1164,22 @@ function tdCtx(){const P=S.plan;const from=addDays(P.date,-90);const T=new Set(S
   // box issue: 2+ different customers with a ticket on the box in the last 30 days
   const box30=new Map();for(const [b,a] of byBox){const c=uniq(a.filter(r=>r.type==='TKT'&&daysBetween(P.date,r.date)<=30).map(r=>r.sid));box30.set(b,c.length);}
   const todayBox=countBy(tasks.filter(r=>r.box),'box');const todayBoxN=new Map(todayBox);
-  const items=tasks.map(t=>{const h=t.sid?(bySid.get(t.sid)||[]):[];const last=h[h.length-1];const gap=last?daysBetween(P.date,last.date):null;
+  const planCnt=countBy(P.rows.filter(r=>r.sid),'sid');const pc=new Map(planCnt);
+  const items=tasks.map(t=>{const h=t.sid?(bySid.get(t.sid)||[]):[];const nAll=h.length+(t.sid?(pc.get(t.sid)||1):1);const last=h[h.length-1];const gap=last?daysBetween(P.date,last.date):null;
     const tk30=h.filter(r=>r.type==='TKT'&&daysBetween(P.date,r.date)<=30);const pk30=h.filter(r=>isPencil(r)&&r.type==='TKT'&&daysBetween(P.date,r.date)<=30);
     let same=false;for(let i=1;i<h.length;i++)if(h[i].res&&h[i].res!=='Not set'&&h[i].res===h[i-1].res)same=true;
     const flags=[];
     if(last&&gap<=30){if(t.type==='TKT')flags.push(['bad',last.type==='POI'?'Ticket after install ≤30d':'Repeat ≤30d']);else if(t.type==='POI'&&tk30.length)flags.push(['bad','POI after ticket ≤30d']);}
     else if(last)flags.push(['warn','Returning (31–90d)']);
-    if(h.length>=3)flags.push(['bad','Chronic · '+h.length+' visits']);
+    if(nAll>=3)flags.push(['bad','Chronic · '+nAll+' times incl. today']);
     if(pk30.length)flags.push(['warn','Pencil kit ≤30d']);
     if(same)flags.push(['warn','Same fix repeated']);
     if((box30.get(t.box)||0)>=2)flags.push(['bad','Box issue?']);
     if((todayBoxN.get(t.box)||0)>=2)flags.push(['warn',todayBoxN.get(t.box)+' tasks on box today']);
     if(t.reopen>=1)flags.push(['warn','Re-opened (G='+t.reopen+')']);
     if(!t.sid)flags.push(['muted','No Local Service ID']);
-    const score=(last&&gap<=30?5:last?2:0)+h.length*1.5+(pk30.length?2:0)+(same?1.5:0)+((box30.get(t.box)||0)>=2?2:0)+(t.reopen>=1?1.5:0);
-    return {t,h,last,gap,flags,score,n:h.length,tk:h.filter(r=>r.type==='TKT').length,samEng:last&&t.eng&&t.eng!=='Unassigned'&&last.eng===t.eng,
+    const score=(last&&gap<=30?5:last?2:0)+(nAll-1)*1.5+(pk30.length?2:0)+(same?1.5:0)+((box30.get(t.box)||0)>=2?2:0)+(t.reopen>=1?1.5:0);
+    return {t,h,last,gap,flags,score,n:h.length,nAll,tk:h.filter(r=>r.type==='TKT').length,samEng:last&&t.eng&&t.eng!=='Unassigned'&&last.eng===t.eng,
       sid:t.sid||'–',cust:t.cust,twn:t.twn,box:t.box,type:t.type,eng:t.eng,prob:t.prob,
       lDate:last&&last.date,lType:last&&last.type,lEng:last&&last.eng,lSrc:last&&last.src,lRes:last&&last.res,lRcc:last&&last.rcc};});
   items.sort((a,b)=>b.score-a.score);
@@ -1172,22 +1190,23 @@ function tdTimeline(h,extra){const a=h.slice(-6);return `<div class="ct">${a.map
 
 V.today=()=>{
   const up=`<div class="tdup"><button class="btn pri" id="tUp"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>Upload today's plan</button>
-    ${S.plan?`<span class="muted">${esc(S.plan.fileName||'')} · plan date ${dlabel(S.plan.date)} · ${S.plan.rows.length} tasks</span><button class="btn" id="tClr">Clear plan</button>`:''}
+    ${Object.keys(S.plans||{}).length?`<div class="seg" role="group" aria-label="Saved plans">${Object.keys(S.plans).sort().reverse().map(d=>`<button data-plan="${d}" aria-pressed="${S.planDate===d}">${sd(d)}${d===todayISO()?' · today':''} · ${S.plans[d].rows.length}</button>`).join('')}</div>`:''}
+    ${S.plan?`<span class="muted">${esc(S.plan.fileName||'')}${S.plan.uploadedAt?' · uploaded '+new Date(S.plan.uploadedAt).toLocaleString():''}</span><button class="btn" id="tClr">Delete this plan</button>`:''}<button class="btn" id="tRef" title="Load plans uploaded by others">Refresh</button>
     <input type="file" id="tfile" accept=".xlsx,.xls,.xlsm,.csv" hidden><span class="msg" id="tmsg" role="alert"></span></div>`;
   const finder=tdFinder();
   if(!S.plan)return `<p class="lede">Upload today's task file (same columns as the daily file, without results). Each task is checked against the last 90 days of saved data.</p>${up}${finder}`;
   const X=tdCtx();const {P,items,tasks}=X;
   if(!tasks.length)return up+`<div class="empty" style="margin:5vh auto"><h2>No tasks for this township</h2><p>Choose All townships in the top bar.</p></div>`+finder;
-  const withH=items.filter(x=>x.n>0),r30=items.filter(x=>x.last&&x.gap<=30),chronic=items.filter(x=>x.n>=3),boxIssue=items.filter(x=>(X.box30.get(x.box)||0)>=2);
+  const withH=items.filter(x=>x.n>0),r30=items.filter(x=>x.last&&x.gap<=30),chronic=items.filter(x=>x.nAll>=3),boxIssue=items.filter(x=>(X.box30.get(x.box)||0)>=2);
   const engs=uniq(tasks.map(t=>t.eng).filter(e=>e&&e!=='Unassigned'));const hdays=uniq(X.hist.map(r=>r.date)).length;
   const head=`<p class="lede">Plan for <b>${dlabel(P.date)}</b>${S.twns.length?' · '+S.twns[0]:''}. Compared with ${hdays} saved day${hdays===1?'':'s'} from ${dlabel(X.from)} to ${dlabel(addDays(P.date,-1))}. The Start / End date in the top bar does not change this page; the Township filter does.</p>`;
-  const cards=`<div class="cards cards4">${card(tasks.length,'Tasks today ('+tasks.filter(t=>t.type==='TKT').length+' TKT · '+tasks.filter(t=>t.type==='POI').length+' POI)',1)}${card(withH.length,'Customers seen in last 90 days')}${card(r30.length,'Possible repeats (last visit ≤30 days)')}${card(chronic.length,'Chronic customers (3+ visits)')}
+  const cards=`<div class="cards cards4">${card(tasks.length,'Tasks today ('+tasks.filter(t=>t.type==='TKT').length+' TKT · '+tasks.filter(t=>t.type==='POI').length+' POI)',1)}${card(withH.length,'Customers seen in last 90 days')}${card(r30.length,'Possible repeats (last visit ≤30 days)')}${card(chronic.length,'Chronic customers (3+ times incl. today)')}
     ${card(uniq(boxIssue.map(x=>x.box)).length,'Boxes with a box-issue sign')}${card(uniq(tasks.map(t=>t.box).filter(Boolean)).length,'Boxes today')}${card(uniq(tasks.map(t=>t.twn)).length,'Townships today')}${card(engs.length||'–','Engineers assigned')}</div>`;
   // needs attention
   const A=[];const add=(l,h)=>A.push({lvl:l,html:h});
   const rt=r30.filter(x=>x.type==='TKT');if(rt.length)add('bad',`<b>${rt.length}</b> of today's tickets are for customers visited in the last 30 days, so they will count as <b>repeat tickets</b>. Most recent: customer <b>${esc(rt.sort((a,b)=>a.gap-b.gap)[0].sid)}</b> (${rt[0].gap} day${rt[0].gap===1?'':'s'} ago).`);
   const pf=items.filter(x=>x.flags.some(f=>f[1].startsWith('POI after ticket')));if(pf.length)add('bad',`<b>${pf.length}</b> POI task(s) are for customers who had a ticket in the last 30 days (POI after first ticket).`);
-  if(chronic.length)add('bad',`<b>${chronic.length}</b> chronic customer(s) with 3 or more visits in 90 days. Top: <b>${esc(chronic.sort((a,b)=>b.n-a.n)[0].sid)}</b> (${chronic[0].n} visits).`);
+  if(chronic.length)add('bad',`<b>${chronic.length}</b> chronic customer(s) seen 3 or more times (90 days + today). Top: <b>${esc(chronic.sort((a,b)=>b.nAll-a.nAll)[0].sid)}</b> (${chronic[0].nAll} times incl. today).`);
   const bi=uniq(boxIssue.map(x=>x.box));if(bi.length)add('bad',`<b>${bi.length}</b> box(es) had tickets from 2 or more customers in the last 30 days and have tasks today: ${bi.slice(0,5).map(esc).join(', ')}${bi.length>5?'…':''}. Check the box first.`);
   const pk=items.filter(x=>x.flags.some(f=>f[1]==='Pencil kit ≤30d'));if(pk.length)add('warn',`<b>${pk.length}</b> customer(s) were fixed with Spliced Cable with Pencil Kit in the last 30 days.`);
   const sm=items.filter(x=>x.flags.some(f=>f[1]==='Same fix repeated'));if(sm.length)add('warn',`<b>${sm.length}</b> customer(s) got the same fix twice in a row before; consider a different fix.`);
@@ -1239,13 +1258,20 @@ function tdRepeated(X){return X.items.filter(x=>x.t.sid&&((x.gap!=null&&x.gap<=3
   return {...x,rp,why:why.join(' · '),pk:x.h.filter(r=>r.type==='TKT'&&isPencil(r)).length,tkN:x.h.filter(r=>r.type==='TKT').length,poiN:x.h.filter(r=>r.type==='POI').length,first:x.h[0]&&x.h[0].date};}).sort((a,b)=>(a.gap??999)-(b.gap??999)||b.rp-a.rp);}
 function tdRepeatList(X){const R=tdRepeated(X);
   const cols=[{l:'Local Service ID (H)',k:'sid'},{l:'Customer',k:'cust'},{l:'Township',k:'twn'},{l:'Box',k:'box'},{l:'Today',k:'type',f:typeTag},{l:'Engineer today',k:'eng'},{l:'Ticket problem',k:'prob'},
-    {l:'Why repeated',k:'why',w:1,f:v=>`<span class="pt pt-bad">${esc(v)}</span>`},{l:'Visits 90d',k:'n',n:1},{l:'Repeat tickets 90d',k:'rp',n:1,c:v=>v?'bad':''},{l:'Last visit',k:'lDate',f:dlabel},{l:'Days ago',k:'gap',n:1,c:v=>v<=7?'bad':v<=30?'warn':''},
+    {l:'Why repeated',k:'why',w:1,f:v=>`<span class="pt pt-bad">${esc(v)}</span>`},{l:'Times (90d + today)',k:'nAll',n:1,c:v=>v>=3?'bad':''},{l:'Repeat tickets 90d',k:'rp',n:1,c:v=>v?'bad':''},{l:'Last visit',k:'lDate',f:dlabel},{l:'Days ago',k:'gap',n:1,c:v=>v<=7?'bad':v<=30?'warn':''},
     {l:'Last engineer',k:'lEng'},{l:'Last root cause (BA)',k:'lSrc'},{l:'Last fix (BB)',k:'lRes'},{l:'Pencil kit 90d',k:'pk',n:1}];
+  // repeated % = repeated customers ÷ customers in today's plan (by Local Service ID)
+  const RS=new Set(R.map(x=>x.t.sid));const pct=(a,b)=>b?Math.round(a/b*100)+'%':'–';
+  const lvl=key=>[...groupBy(X.items.filter(x=>x.t.sid),key)].map(([k,a])=>{const ids=uniq(a.map(x=>x.t.sid)),rp=ids.filter(i=>RS.has(i));return {k:k||'Not set',tasks:a.length,ids:ids.length,rep:rp.length,p:ids.length?rp.length/ids.length:null,r30:uniq(a.filter(x=>x.gap!=null&&x.gap<=30).map(x=>x.t.sid)).length};}).sort((a,b)=>(b.p||0)-(a.p||0)||b.ids-a.ids);
+  const allIds=uniq(X.items.filter(x=>x.t.sid).map(x=>x.t.sid));
+  const lc=f=>[{l:f,k:'k'},{l:'Tasks today',k:'tasks',n:1},{l:'Customers (IDs)',k:'ids',n:1},{l:'Repeated IDs',k:'rep',n:1,c:v=>v?'bad':''},{l:'Repeated %',k:'p',n:1,f:v=>v==null?'–':Math.round(v*100)+'%',c:v=>v>=.3?'bad':v>=.15?'warn':''},{l:'Last visit ≤30d',k:'r30',n:1}];
+  const levels=`<div class="cards cards4" style="margin:4px 0 12px">${card(pct(RS.size,allIds.length),'Repeated % (all customers today)',1)}${card(RS.size+' / '+allIds.length,'Repeated IDs / customers')}${card(uniq(X.items.map(x=>x.t.region).filter(Boolean)).join(', ')||'–','Region(s) in plan')}${card(uniq(X.items.map(x=>x.twn)).length,'Townships')}</div>
+    <h3 class="sub">Regional level</h3>${tbl(lc('Region (AR)'),lvl(x=>x.t.region||''),{h:260,colf:false})}<h3 class="sub" style="margin-top:12px">Township level</h3>${tbl(lc('Township'),lvl('twn'),{h:320,colf:false})}`;
   return panel('Repeated Local Service IDs',`Customers in today's plan who have repeated: last visit within 30 days (today's task will be a repeat), or at least one repeat ticket in the last 90 days. ${R.length} of ${X.tasks.length} tasks. <b>Export</b> saves this list and every saved visit of these customers to Excel.`,
-    `<div class="row" style="margin:4px 0 10px"><button class="btn pri" id="tdExp" ${R.length?'':'disabled'}>Export to Excel (all details)</button><span class="msg" id="tdExpMsg"></span></div>`+(R.length?tbl(cols,R,{h:520,colf:true}):'<p class="note">No repeated Local Service ID in today\'s plan.</p>'));}
+    levels+`<h3 class="sub" style="margin-top:14px">Repeated IDs</h3><div class="row" style="margin:4px 0 10px"><button class="btn pri" id="tdExp" ${R.length?'':'disabled'}>Export to Excel (all details)</button><span class="msg" id="tdExpMsg"></span></div>`+(R.length?tbl(cols,R,{h:520,colf:true}):'<p class="note">No repeated Local Service ID in today\'s plan.</p>'));}
 function tdExport(){const X=tdCtx();const R=tdRepeated(X);if(!R.length)return;const P=X.P;
   const s1=R.map(x=>({'Local Service ID':x.sid,'Customer Name':x.cust||'','Township':x.twn,'Box Name':x.box||'','Today Task No':x.t.task,'Today Type':x.type,'Today LAN Engineer':x.eng||'','Today SR':x.t.sr||'','Ticket Problem':x.prob||'',
-    'Re-Opening Counts (G)':x.t.reopen||0,'Why repeated':x.why,'Visits 90d':x.n,'Tickets 90d':x.tkN,'POI 90d':x.poiN,'Repeat tickets 90d':x.rp,'Spliced Cable with Pencil Kit 90d':x.pk,
+    'Re-Opening Counts (G)':x.t.reopen||0,'Why repeated':x.why,'Times (90d + today)':x.nAll,'Visits 90d':x.n,'Region':x.t.region||'','Tickets 90d':x.tkN,'POI 90d':x.poiN,'Repeat tickets 90d':x.rp,'Spliced Cable with Pencil Kit 90d':x.pk,
     'First visit (90d)':x.first||'','Last visit':x.lDate||'','Days since last visit':x.gap,'Last type':x.lType||'','Last engineer':x.lEng||'','Last root cause category (AZ)':x.lRcc||'','Last root cause (BA)':x.lSrc||'','Last resolution (BB)':x.lRes||'',
     'Signs':x.flags.map(f=>f[1]).join('; ')}));
   const s2=[];for(const x of R)for(const r of x.h)s2.push({'Local Service ID':x.sid,'Customer Name':r.cust||x.cust||'','Schedule Date':r.date,'Task No':r.task,'Type':r.type,'Township':r.twn,'SR Name':r.sr,'Box Name':r.box||'',
@@ -1253,7 +1279,8 @@ function tdExport(){const X=tdCtx();const R=tdRepeated(X);if(!R.length)return;co
     'Root Cause Category (AZ)':r.rcc,'Service Root Cause (BA)':r.src,'On-site Resolution (BB)':r.res,'On-site Resolution-2 (BC)':r.res2||'','Task Status':r.status||'','After dBm':r.db??'','Usage Cable Type':r.cable||'','Fiber Usage Meter':r.fiber||0,'Re-Opening Counts (G)':r.reopen||0});
   const s3=R.map(x=>{const t=x.t;return {'Local Service ID':t.sid,'Schedule Date':t.date,'Task No':t.task,'Type':t.type,'Customer Name':t.cust||'','Township':t.twn,'Box Name':t.box||'','SR Name':t.sr||'','LAN Engineer':t.eng||'','Ticket Problem':t.prob||'','Ticket Create Date':t.created||'','Re-Opening Counts (G)':t.reopen||0};});
   const wb=XLSX.utils.book_new();const add=(rows,name)=>{const ws=XLSX.utils.json_to_sheet(rows);const keys=Object.keys(rows[0]||{});ws['!cols']=keys.map(k=>({wch:Math.min(40,Math.max(k.length,...rows.slice(0,200).map(r=>String(r[k]??'').length))+2)}));ws['!autofilter']={ref:ws['!ref']};XLSX.utils.book_append_sheet(wb,ws,name);};
-  add(s1,'Repeated IDs');add(s2.length?s2:[{'Local Service ID':''}],'Visit history 90d');add(s3,'Today tasks');
+  const RS2=new Set(R.map(x=>x.t.sid));const lv=key=>[...groupBy(X.items.filter(x=>x.t.sid),key)].map(([k,a])=>{const ids=uniq(a.map(x=>x.t.sid)),rp=ids.filter(i=>RS2.has(i));return {'Level':k||'Not set','Tasks today':a.length,'Customers (IDs)':ids.length,'Repeated IDs':rp.length,'Repeated %':ids.length?Math.round(rp.length/ids.length*1000)/10:0};});
+  add(s1,'Repeated IDs');add(lv(x=>x.t.region||''),'Region repeated %');add(lv('twn'),'Township repeated %');add(s2.length?s2:[{'Local Service ID':''}],'Visit history 90d');add(s3,'Today tasks');
   XLSX.writeFile(wb,`Repeated Local Service IDs ${P.date}.xlsx`);
   const m=$('#tdExpMsg');if(m){m.className='msg ok';m.textContent=`Saved ${R.length} IDs and ${s2.length} past visits.`;}}
 document.addEventListener('click',e=>{if(e.target.closest('#tdExp'))tdExport();});
@@ -1276,7 +1303,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-tdq]');if(
   if(e.target.closest('#tdGo')){S.tdQ=$('#tdQ').value;tdFindRefresh();}
   if(e.target.closest('#tdClr')){S.tdQ='';tdFindRefresh();}
   if(e.target.closest('#tUp')){$('#tfile').click();}
-  if(e.target.closest('#tClr')){const b2=e.target.closest('#tClr');if(b2.dataset.c!=='1'){b2.dataset.c='1';b2.textContent='Confirm clear';return;}S.plan=null;saveTodayPlan().finally(render);}});
+  if(e.target.closest('#tClr')){const b2=e.target.closest('#tClr');if(b2.dataset.c!=='1'){b2.dataset.c='1';b2.textContent='Confirm clear';return;}const d=S.planDate;deletePlan(d).finally(()=>{const k=Object.keys(S.plans||{}).sort();S.planDate=k[k.length-1]||null;S.plan=S.planDate?S.plans[S.planDate]:null;render();});}
+  const pb=e.target.closest('[data-plan]');if(pb){S.planDate=pb.dataset.plan;S.plan=S.plans[S.planDate];render();}
+  if(e.target.closest('#tRef')){const b3=e.target.closest('#tRef');b3.disabled=true;b3.textContent='Refreshing…';loadTodayPlan().finally(render);}});
 document.addEventListener('keydown',e=>{if(e.target.id==='tdQ'&&e.key==='Enter'){S.tdQ=e.target.value;tdFindRefresh();}});
 document.addEventListener('change',async e=>{if(e.target.id!=='tfile')return;const f=e.target.files[0];e.target.value='';if(!f)return;
   const say=(t,c)=>{const m=$('#tmsg');if(m){m.className='msg '+(c||'');m.textContent=t;}};say('Reading '+f.name+'…');
@@ -1285,11 +1314,22 @@ document.addEventListener('change',async e=>{if(e.target.id!=='tfile')return;con
     const rows=parseWorkbook(XLSX,wb,{defDate:todayISO(),extra:true});
     if(!rows.length)throw new Error('“'+f.name+'” has no tasks. Fill in at least Task No (column C) for each task.');
     const date=uniq(rows.map(r=>r.date)).sort().pop();
-    S.plan={date,fileName:f.name,uploadedAt:new Date().toISOString(),rows:rows.filter(r=>r.date===date)};
-    try{await saveTodayPlan();}catch(x){render();say(x.message,'err');return;}
+    S.plan={date,fileName:f.name,uploadedAt:new Date().toISOString(),rows:rows.filter(r=>r.date===date)};S.planDate=date;
+    try{await savePlan(S.plan);}catch(x){render();say(x.message,'err');return;}
     render();say('Loaded '+S.plan.rows.length+' tasks for '+dlabel(date)+'.','ok');}
   catch(err){say(err.message||String(err),'err');}});
 
+// ---------- Repeated Tickets: township / region repeated % ----------
+function rpLevels(W){const {win,pairs,from,ref}=W;const tk=win.filter(r=>r.type==='TKT');const pr=pairs.filter(p=>p.kind!==RK[2]);
+  const lv=(rk,pk)=>{const keys=uniq(tk.map(rk).concat(pr.map(pk)));return keys.map(k=>{const t=tk.filter(r=>rk(r)===k),p=pr.filter(x=>pk(x)===k);const c=uniq(t.map(r=>r.sid).filter(Boolean)),rc=uniq(p.map(x=>x.sid));
+      return {k,tk:t.length,rp:p.length,p:t.length?p.length/t.length:null,cust:c.length,rc:rc.length,pc:c.length?rc.length/c.length:null,tp:p.filter(x=>x.kind===RK[1]).length};}).sort((a,b)=>(b.p||0)-(a.p||0)||b.tk-a.tk);};
+  const pct=v=>v==null?'–':Math.round(v*100)+'%';const hot=v=>v>=.3?'bad':v>=.15?'warn':'';
+  const cols=f=>[{l:f,k:'k'},{l:'Tickets',k:'tk',n:1},{l:'Repeat tickets',k:'rp',n:1,c:v=>v?'bad':''},{l:'Repeated % (tickets)',k:'p',n:1,f:pct,c:hot},{l:'Customers',k:'cust',n:1},{l:'Repeated customers',k:'rc',n:1},{l:'Repeated % (customers)',k:'pc',n:1,f:pct,c:hot},{l:'Ticket after POI install',k:'tp',n:1}];
+  const reg=lv(r=>r.region||'Not set',p=>(p.cRow&&p.cRow.region)||'Not set');const tw=lv(r=>r.twn,p=>p.twn);
+  const allP=tk.length?pr.length/tk.length:null;const noReg=tk.filter(r=>!r.region).length;
+  return panel('Repeated % by region and township',`Tickets in ${from===ref?dlabel(ref):dlabel(from)+' – '+dlabel(ref)}. <b>Repeated % (tickets)</b> = repeat tickets ÷ tickets. <b>Repeated % (customers)</b> = customers with a repeat ÷ customers with a ticket. Follows the Repeat type at the top.${noReg?` ${noReg} ticket(s) have no Region (AR); days uploaded before v24 need to be uploaded again to show their region.`:''}`,
+    `<div class="cards cards4" style="margin-bottom:12px">${card(pct(allP),'Repeated % (all tickets)',1)}${card(pr.length+' / '+tk.length,'Repeat tickets / tickets')}${card(reg.filter(r=>r.k!=='Not set').length||'–','Regions')}${card(tw.length,'Townships')}</div>
+     <h3 class="sub">Regional level</h3>${tbl(cols('Region (AR)'),reg,{h:260,colf:false})}<h3 class="sub" style="margin-top:12px">Township level</h3>${tbl(cols('Township'),tw,{h:360,colf:false})}`);}
 // ---------- repeat tickets: filter row in every section ----------
 function addRpBars(html){if(!html.includes('<section'))return html;
   html=html.replace(/<label>Period<select[\s\S]*?<\/select><\/label>/g,'');
@@ -1326,7 +1366,7 @@ const san=s=>String(s==null?'':s).replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').r
 
 function reportDialog(){const dates=Object.keys(S.days).sort();if(!dates.length){alert('Upload a daily file first.');return;}
   const last=dates[dates.length-1],first=dates[0];const fd=uniq(filtered().map(r=>r.date)).sort();
-  const d=$('#rdlg');const secs=[['sum','Summary and key figures'],['att','Needs attention'],['twn','Township summary'],['day','Daily summary'],['kpi','Engineer KPI'],['team','Township & SR resources'],['rep','Repeat tickets and POI after first ticket'],['arr','Arrival'],['root','Root cause and resolution'],['cab','Cable and fiber']];
+  const d=$('#rdlg');const secs=[['sum','Summary and key figures'],['att','Needs attention'],['twn','Township summary'],['day','Daily summary'],['kpi','Engineer KPI'],['team','Township & SR resources'],['rep','Repeated Tickets and POI after first ticket'],['arr','Arrival'],['root','Root cause and resolution'],['cab','Cable and fiber']];
   d.innerHTML=`<h2>Generate report (PDF)</h2><p>Choose the period and what to include. The PDF downloads to this device.</p>
    <fieldset class="rf"><legend>Period</legend>
     <label><input type="radio" name="rp" value="filter" checked> Current Start / End date ${fd.length?`<span class="muted">(${dlabel(fd[0])} - ${dlabel(fd[fd.length-1])}, ${fd.length} day${fd.length>1?'s':''})</span>`:''}</label>
@@ -1431,7 +1471,7 @@ async function buildPdf(rows,{from,to,label,tw,inc}){
   if(inc.has('team')){h1('Township & SR resources');const cols=['','LAN engineers','Car IDs','Labour IDs','Tickets','POI','Avg car / engineer','Avg engineer / car'];
     const m=g=>g.map(o=>[o.k,o.eng,o.car,o.lab,o.tkt,o.poi,f2(o.carPerEng),f2(o.engPerCar)]);
     table(['Township',...cols.slice(1)],m(teamGroup(rows,'twn')));table(['SR',...cols.slice(1)],m(teamGroup(rows,'sr')));}
-  if(inc.has('rep')){h1('Repeat tickets');
+  if(inc.has('rep')){h1('Repeated Tickets');
     const TW=new Set(tw);const hist=S.rows.filter(r=>r.date<=to&&r.date>=addDays(from,-30)&&(!TW.size||TW.has(r.twn)));const DS=new Set(days);
     const all=repeatPairs(hist).filter(p=>DS.has(p.cDate)&&p.cDate>=from);const pr=all.filter(p=>p.kind!==RK[2]),pf=all.filter(p=>p.kind===RK[2]);
     const tk=rows.filter(r=>r.type==='TKT').length;
