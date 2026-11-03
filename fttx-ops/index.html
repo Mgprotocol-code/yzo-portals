@@ -1534,6 +1534,33 @@ function planTab(P){
     el("p",{class:"note",style:"margin:-6px 0 12px",text:R.length+" planned sites ("+(R0.length-R.length?R0.length+" rows, duplicate boxes counted once":"one per box")+"). History from finished reports up to "+(lastDone?nice(lastDone):"—")+". "+(LIVE?"Live from Google Sheet, loaded "+new Date(S.livePlan.at).toTimeString().slice(0,5)+".":S.plans[D]&&S.plans[D].uploadedAt?"Last upload "+upNice(S.plans[D].uploadedAt)+".":"")}));
   {const lg=planLog(PL.sel);if(lg.length){const hm=iso=>{const t=new Date(iso);return pad(t.getHours())+":"+pad(t.getMinutes());};
     P.append(el("div",{class:"uplog"},el("b",{text:"Merged from "+lg.length+" upload"+(lg.length>1?"s":"")+": "}),...lg.map((u,i)=>el("span",{class:"uplg"},hm(u.at)+" "+(i?"+"+u.added+" new, "+u.updated+" updated":u.rows+" rows")))));}}
+  // ---- Today YGN and Today Regional, side by side (from the live sheet, all cities)
+  if(LIVE&&S.livePlan.rows.some(r=>r._tab)){
+    const tabs=[...new Set(S.livePlan.rows.map(r=>r._tab))],sec=el("div",{class:"grid"});
+    tabs.forEach(tn=>{
+      const raw=S.livePlan.rows.filter(r=>r._tab===tn).map(r=>Object.assign({cg:catGroup(r.cat),cy:cityOf(r),st:status(r)},r));
+      const seenT=new Set(),a=raw.filter(r=>{const k=(r.bx||"").trim().toUpperCase();if(!k)return true;if(seenT.has(k))return false;seenT.add(k);return true;});
+      const ok=a.filter(r=>r.st==="ok").length,pe=a.filter(r=>r.st==="pend"),nu=a.filter(r=>r.st==="none").length,ygn=/ygn|yangon/i.test(tn);
+      const body=el("div");
+      body.append(el("div",{class:"smart"},
+        sm("📋",a.length,"Planned sites",raw.length!==a.length?raw.length+" rows, one per box":"",""),
+        sm("✅",ok+" / "+a.length,"Resolved",pct(ok,a.length)+" done",ok===a.length&&a.length?"good":""),
+        sm("⏳",pe.length,"Pending",PKINDS.map(k=>[k,pe.filter(r=>pendKind({st:"pend",be:r.be})===k).length]).filter(x=>x[1]).map(x=>x[0].replace(" Pending","")+" "+x[1]).join(" · ")||"—",pe.length?"warn":"good"),
+        sm("🕒",nu,"Not updated yet","No Backend Status",nu?"warn":"good"),
+        sm("👷",uniq(raw,r=>r.e),"Engineers",uniq(raw,r=>r.bk)+" BKs · "+uniq(raw,r=>r.car)+" cars",""),
+        sm("⭐",a.filter(r=>/^p1$/i.test((r.pr||"").trim())).length,"P1 sites",a.filter(r=>/sla/i.test(r.ct||"")).length+" FR-SLA · "+sum(a.map(r=>r.imp))+" customers impacted","")));
+      // by group
+      const gsT=GROUPS.filter(g=>a.some(r=>r.cg===g));
+      const gr=gsT.map(g=>{const b=a.filter(r=>r.cg===g),o={g,n:b.length,ok:b.filter(r=>r.st==="ok").length,pe:b.filter(r=>r.st==="pend").length,nu:b.filter(r=>r.st==="none").length};o.pct=Math.round(o.ok*100/(o.n||1));return o;});
+      body.append(table([{key:"g",label:"Group",render:x=>el("span",{class:"gtag",style:"--gc:var("+GCOL[x.g]+")",text:x.g})},{key:"n",label:"Planned",num:1},{key:"ok",label:"Resolved",num:1,cls:"c-ok"},{key:"pe",label:"Pending",num:1,cls:"c-pend"},{key:"nu",label:"Not updated",num:1},{key:"pct",label:"Done %",num:1,fmt:v=>v+"%"}],gr,{}));
+      // by region (YGN) or city (Regional), with townships
+      const key=ygn?(r=>r.r||"(blank)"):(r=>r.cy||"(blank)");
+      const rr=count(a,key).map(([k])=>{const b=a.filter(r=>key(r)===k),o={k,n:b.length,ok:b.filter(r=>r.st==="ok").length,pe:b.filter(r=>r.st==="pend").length,nu:b.filter(r=>r.st==="none").length,down:b.filter(r=>r.cg==="Site Down").length,tw:count(b,r=>r.tw).slice(0,4).map(x=>x[0]+" "+x[1]).join(", ")};o.pct=Math.round(o.ok*100/(o.n||1));return o;});
+      body.append(el("div",{style:"margin-top:8px"},table([{key:"k",label:ygn?"Region":"City",render:x=>el("b",{text:x.k})},{key:"n",label:"Planned",num:1},{key:"down",label:"Site Down",num:1},{key:"ok",label:"Resolved",num:1,cls:"c-ok"},{key:"pe",label:"Pending",num:1,cls:"c-pend"},{key:"nu",label:"Not updated",num:1},{key:"pct",label:"Done %",num:1,fmt:v=>v+"%"},{key:"tw",label:"Townships"}],rr,{sort:"n"})));
+      sec.append(card("📄 "+tn,a.length+" planned sites · "+pct(ok,a.length)+" resolved so far",body));
+    });
+    P.append(el("h3",{class:"subsec",text:"Today YGN and Today Regional, separately"}),sec);
+  }
   if(!R.length){P.append(el("p",{class:"msg err",text:"No planned sites for "+(S.city==="All"?"any city":S.city)+" on this day."}));return;}
   const gs=GROUPS.filter(g=>R.some(r=>r.cg===g));
   P.append(kpis([{v:R.length,k:"Planned sites"}].concat(gs.map(g=>({v:R.filter(r=>r.cg===g).length,k:g,grp:g})),[
@@ -1906,7 +1933,7 @@ async function gsLoad(quiet){
     const sheets=await gsFetch(),by={};let used=0;
     for(const s of sheets){const rows=parseSheet(s.aoa);if(!rows||!rows.length)continue;used++;
       const ygn=/yangon|ygn/i.test(s.name),sd=/today/i.test(s.name)?tdyStr():(parseDate(s.name)||tdyStr());
-      rows.forEach(r=>{const g=String(r.r||"").trim().toUpperCase();r.cy=(ygn||YGN_REG.test(g))?"YGN":(g||String(r.tw||"").trim().toUpperCase()||"OTHER");const d=/today/i.test(s.name)?sd:(r._d||sd);(by[d]=by[d]||[]).push(r);});}
+      rows.forEach(r=>{const g=String(r.r||"").trim().toUpperCase();r._tab=s.name;r.cy=(ygn||YGN_REG.test(g))?"YGN":(g||String(r.tw||"").trim().toUpperCase()||"OTHER");const d=/today/i.test(s.name)?sd:(r._d||sd);(by[d]=by[d]||[]).push(r);});}
     if(!used)throw new Error("No tab with an Engineer Name / Engineer 1 header row was found in the sheet.");
     const ds=Object.keys(by).sort(),date=by[tdyStr()]?tdyStr():ds[ds.length-1];
     S.livePlan={date,rows:by[date],at:new Date().toISOString(),tabs:used,dates:ds};
