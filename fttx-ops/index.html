@@ -334,7 +334,7 @@ function parseDate(txt){
   m=txt.match(/(\d{1,2})[\s\-_.]*([A-Za-z]{3})[A-Za-z]*[\s\-_.,]+(\d{2})(?!\d)/);
   if(m&&MON[m[2].toLowerCase()]&&!/\bto\b/i.test(txt))return "20"+m[3]+"-"+pad(MON[m[2].toLowerCase()])+"-"+pad(+m[1]);
   m=txt.match(/(\d{4})[\-_.](\d{1,2})[\-_.](\d{1,2})/); if(m)return m[1]+"-"+pad(+m[2])+"-"+pad(+m[3]);
-  m=txt.match(/(\d{1,2})[\-_.\/](\d{1,2})[\-_.\/](\d{4})/); if(m)return m[3]+"-"+pad(+m[2])+"-"+pad(+m[1]);
+  m=txt.match(/(\d{1,2})[\-_.\/](\d{1,2})[\-_.\/](\d{4})/); if(m){const x=+m[1],y=+m[2];return x<=12&&y>12?m[3]+"-"+pad(x)+"-"+pad(y):m[3]+"-"+pad(y)+"-"+pad(x);}   // d/m/y, or m/d/y when the day is clearly second
   return null;
 }
 
@@ -1401,17 +1401,15 @@ const PLAN_KEEP=2;   // only the newest 2 planning days are kept
 function tdyStr(){const t=new Date();return t.getFullYear()+"-"+pad(t.getMonth()+1)+"-"+pad(t.getDate());}
 const isPlanDoc=v=>!!v&&(v.kind==="plan"||String(v.file||"").startsWith("PLAN|"));
 function planDates(){return Object.keys(S.plans||{}).sort();}
-function planLog(d){const p=S.plans&&S.plans[d];if(!p)return[];const m=p.rows.find(r=>r&&r._meta);return m&&Array.isArray(m.uploads)?m.uploads:[];}
-function planRows(d){const p=S.plans&&S.plans[d];if(!p)return[];
+function planLog(d){if(d==="LIVE")return[];const p=S.plans&&S.plans[d];if(!p)return[];const m=p.rows.find(r=>r&&r._meta);return m&&Array.isArray(m.uploads)?m.uploads:[];}
+function planRows(d){const p=d==="LIVE"?S.livePlan:(S.plans&&S.plans[d]);if(!p)return[];
   return p.rows.filter(r=>r&&!r._meta).map((r,i)=>Object.assign({d,i,cg:catGroup(r.cat),cy:cityOf(r),tg:r.te?teamType(r.te):(cityOf(r)!=="YGN"?cityOf(r)+" team":teamType(r.te))},r)).filter(r=>S.city==="All"||r.cy===S.city);}
 async function writePlan(date,rows,file){
-  const parts=chunk(rows),at=new Date().toISOString(),old=(S.plans[date]&&S.plans[date].parts)||1,before=planDates();
-  for(let i=0;i<parts.length;i++)await S.db.doc("days/plan_"+date+"_"+i).set({kind:"plan",date,part:i,parts:parts.length,file:"PLAN|"+file,uploadedAt:at,rows:parts[i]});
-  for(let i=parts.length;i<old;i++)await S.db.doc("days/plan_"+date+"_"+i).delete();
-  const keep=new Set(before.concat(date).sort().slice(-PLAN_KEEP));
-  for(const d of before)if(!keep.has(d)){const n=(S.plans[d]&&S.plans[d].parts)||1;for(let i=0;i<n;i++)await S.db.doc("days/plan_"+d+"_"+i).delete();}
+  // nothing is saved: keep the planning in memory (this browser tab) only, newest PLAN_KEEP days
+  S.plans=S.plans||{};S.plans[date]={rows,parts:1,file,uploadedAt:new Date().toISOString()};
+  const keep=new Set(Object.keys(S.plans).sort().slice(-PLAN_KEEP));Object.keys(S.plans).forEach(d=>{if(!keep.has(d))delete S.plans[d];});
 }
-async function deletePlan(d){const n=(S.plans[d]&&S.plans[d].parts)||1;for(let i=0;i<n;i++)await S.db.doc("days/plan_"+d+"_"+i).delete();}
+async function deletePlan(d){if(S.plans)delete S.plans[d];}
 // History for planned sites: only Backend Status "Resolved" rows of CA1 Broken, CA2 Broken, CA1 High Loss, CA2 High Loss
 const HIST_CATS=new Set(["ca1 broken","ca2 broken","ca1 high loss","ca2 high loss"]);
 const histOk=r=>/^resolved$/i.test(String(r.be||"").trim())&&HIST_CATS.has(String(r.cat||"").toLowerCase().replace(/\s+/g," ").trim());
@@ -1428,8 +1426,10 @@ function planHistory(rows,D){
 }
 function planTab(P){
   const pds=planDates();
-  if(!PL.sel||!S.plans[PL.sel])PL.sel=pds[pds.length-1]||null;
-  P.append(el("p",{class:"ctx",text:"CMA7-Special: upload today’s planning sheet. Each planned site is checked against the finished site-done reports of the last 30 days, so the team knows what happened there before. Only the newest "+PLAN_KEEP+" planning days are kept."}));
+  if(PL.sel==="LIVE"&&!S.livePlan)PL.sel=null;
+  if(!PL.sel||(PL.sel!=="LIVE"&&!S.plans[PL.sel]))PL.sel=S.livePlan?"LIVE":(pds[pds.length-1]||null);
+  P.append(el("p",{class:"ctx",text:"CMA7-Special: upload today’s planning sheet. Each planned site is checked against the finished site-done reports of the last 30 days, so the team knows what happened there before. Nothing here is saved: the planning stays only in this browser tab and is gone after a reload."}));
+  P.append(el("div",{class:"grid",style:"margin-bottom:16px"},gsCard()));
   // ---- upload
   const inp=el("input",{type:"file",accept:".xlsx,.xls,.xlsm",multiple:"",style:"display:none"});
   const drop=el("div",{class:"drop plandrop"},el("p",{},el("b",{text:"CMA7-Special: upload today’s planning"})),el("p",{text:"Drop the planning Excel here, or"}),el("button",{class:"btn",type:"button",text:"Choose planning file"}),inp);
@@ -1439,11 +1439,12 @@ function planTab(P){
   drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over");});drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
   drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");readPlan([...e.dataTransfer.files]);});
   // saved planning days
-  const saved=el("div",{class:"svrow"},el("span",{class:"note",text:pds.length?"Planning days:":"No planning uploaded yet."}));
+  const saved=el("div",{class:"svrow"},el("span",{class:"note",text:pds.length||S.livePlan?"Shown now (not saved):":"No planning loaded yet."}));
+  if(S.livePlan){const lb=el("button",{type:"button",class:"chip"+(PL.sel==="LIVE"?" on":""),text:"🔴 Live sheet, "+nice(S.livePlan.date)+" ("+planRows("LIVE").length+")"});lb.addEventListener("click",()=>{PL.sel="LIVE";render();});saved.append(el("span",{class:"plday"},lb));}
   pds.slice().reverse().forEach(d=>{const n=planRows(d).length;const b=el("button",{type:"button",class:"chip"+(d===PL.sel?" on":""),text:(d===tdyStr()?"Today, ":"")+nice(d)+" ("+n+")"});b.addEventListener("click",()=>{PL.sel=d;render();});
-    const x=el("button",{type:"button",class:"btn danger small",text:"Delete"});x.addEventListener("click",async()=>{if(!confirm("Delete the planning for "+d+"?"))return;x.disabled=true;try{await deletePlan(d);if(PL.sel===d)PL.sel=null;}catch(e){alert("Delete failed: "+(e.message||e));x.disabled=false;}});
+    const x=el("button",{type:"button",class:"btn danger small",text:"Remove"});x.addEventListener("click",async()=>{try{await deletePlan(d);if(PL.sel===d)PL.sel=null;render();}catch(e){}});
     saved.append(el("span",{class:"plday"},b,x));});
-  P.append(el("div",{class:"grid"},card("CMA7-Special upload","Same layout as the daily planning raw file (Yangon and Other City tabs are both read). The date comes from the Date column, sheet name or file name; if none is found it is set to today.",drop,prev,msg,saved)));
+  P.append(el("div",{class:"grid"},card("CMA7-Special upload","Same layout as the daily planning raw file (Yangon and Other City tabs are both read). The date comes from the Date column, sheet name or file name; if none is found it is set to today. Not saved anywhere.",drop,prev,msg,saved)));
   async function readPlan(files){
     msg.textContent="";msg.className="msg";PL.pending=[];
     if(!window.XLSX){msg.textContent="The Excel reader did not load. Reload the page.";msg.className="msg err";return;}
@@ -1461,13 +1462,12 @@ function planTab(P){
     prev.textContent="";
     PL.pending.forEach(p=>{const row=el("div",{class:"row"});if(p.err){row.append(el("span",{class:"down",text:p.file+": "+p.err}));prev.append(row);return;}
       const di=el("input",{type:"date",value:p.date,"aria-label":"Planning date"});di.addEventListener("change",()=>p.date=di.value);
-      row.append(el("b",{text:p.file}),el("span",{text:p.rows.length+" planned rows ("+p.cities+")"}),el("label",{},"Plan date ",di));if(S.plans[p.date])row.append(tag("rep","Will merge with "+planRows(p.date).length+" saved rows ("+Math.max(1,planLog(p.date).length)+" upload"+(planLog(p.date).length>1?"s":"")+")"));prev.append(row);});
+      row.append(el("b",{text:p.file}),el("span",{text:p.rows.length+" planned rows ("+p.cities+")"}),el("label",{},"Plan date ",di));if(S.plans[p.date])row.append(tag("rep","Will merge with "+planRows(p.date).length+" rows shown ("+Math.max(1,planLog(p.date).length)+" upload"+(planLog(p.date).length>1?"s":"")+")"));prev.append(row);});
     const ok=PL.pending.filter(p=>!p.err);if(!ok.length)return;
-    const sb=el("button",{class:"btn",type:"button",text:"Save planning"}),rc=el("input",{type:"checkbox"});rc.checked=!!PL.replace;rc.addEventListener("change",()=>PL.replace=rc.checked);prev.append(el("div",{class:"svrow",style:"margin-top:10px"},sb,el("label",{class:"note"},rc,"Replace the saved planning for that day instead of merging")));
+    const sb=el("button",{class:"btn",type:"button",text:"Show planning"}),rc=el("input",{type:"checkbox"});rc.checked=!!PL.replace;rc.addEventListener("change",()=>PL.replace=rc.checked);prev.append(el("div",{class:"svrow",style:"margin-top:10px"},sb,el("label",{class:"note"},rc,"Replace the planning shown for that day instead of merging")));
     sb.addEventListener("click",async()=>{
       if(ok.some(p=>!/^\d{4}-\d{2}-\d{2}$/.test(p.date))){msg.textContent="Set a date before saving.";msg.className="msg err";return;}
-      if(!S.db){msg.textContent="Saving is not available here.";msg.className="msg err";return;}
-      sb.disabled=true;msg.textContent="Saving…";
+      sb.disabled=true;msg.textContent="Loading…";
       try{for(const p of ok){
           // merge with what is already saved for that day: a newer row for the same box replaces the older one, new boxes are added
           const replace=PL.replace,stamp=new Date().toISOString(),oldAll=S.plans[p.date]?S.plans[p.date].rows:[],log=replace?[]:(planLog(p.date)||[]).slice();
@@ -1476,7 +1476,7 @@ function planTab(P){
           p.rows.forEach(r=>{const k=key(r),o=m.get(k);r._up=stamp;if(o){upd++;r._first=o._first||o._up||stamp;}else{added++;r._first=stamp;}m.set(k,r);});
           log.push({at:stamp,file:p.file,rows:p.rows.length,added,updated:upd});
           await writePlan(p.date,[{_meta:1,uploads:log}].concat([...m.values()]),p.file);}
-        PL.sel=ok.map(p=>p.date).sort().pop();PL.pending=[];msg.textContent="Planning saved.";msg.className="msg ok";setTimeout(render,600);}
+        PL.sel=ok.map(p=>p.date).sort().pop();PL.pending=[];msg.textContent="Planning shown (not saved).";msg.className="msg ok";setTimeout(render,300);}
       catch(e){sb.disabled=false;msg.textContent=/failed to fetch|networkerror|load failed/i.test(String(e&&e.message||e))?"Could not reach the database. Open the portal from its GitHub link and try again.":/row-level security|permission denied|42501/i.test(String(e&&e.message||e)+(e&&e.code||""))?"The database refused the save (table permissions).":"Save failed: "+(e&&e.message||e);msg.className="msg err";}
     });
   }
@@ -1526,12 +1526,12 @@ function planTab(P){
    if(PL.fq)run();}
   if(!PL.sel)return;
   // ---- the plan
-  const D=PL.sel,R0=planRows(D);
+  const LIVE=PL.sel==="LIVE",D=LIVE?S.livePlan.date:PL.sel,R0=planRows(PL.sel);
   const seen=new Set(),R=R0.filter(r=>{const k=(r.bx||"").trim().toUpperCase();if(!k)return true;if(seen.has(k))return false;seen.add(k);return true;});
   const H=planHistory(R,D),lastDone=allDates().filter(d=>d<D).filter(hasDay).pop();
-  P.append(el("h2",{class:"sec",text:"CMA7-Special: planning for "+nice(D)+" "+D.slice(0,4)+(D===tdyStr()?" (today)":"")}),
-    el("p",{class:"note",style:"margin:-6px 0 12px",text:R.length+" planned sites ("+(R0.length-R.length?R0.length+" rows, duplicate boxes counted once":"one per box")+"). History from finished reports up to "+(lastDone?nice(lastDone):"—")+". "+(S.plans[D].uploadedAt?"Last upload "+upNice(S.plans[D].uploadedAt)+".":"")}));
-  {const lg=planLog(D);if(lg.length){const hm=iso=>{const t=new Date(iso);return pad(t.getHours())+":"+pad(t.getMinutes());};
+  P.append(el("h2",{class:"sec",text:(LIVE?"🔴 Live: ":"")+"CMA7-Special: planning for "+nice(D)+" "+D.slice(0,4)+(D===tdyStr()?" (today)":"")}),
+    el("p",{class:"note",style:"margin:-6px 0 12px",text:R.length+" planned sites ("+(R0.length-R.length?R0.length+" rows, duplicate boxes counted once":"one per box")+"). History from finished reports up to "+(lastDone?nice(lastDone):"—")+". "+(LIVE?"Live from Google Sheet, loaded "+new Date(S.livePlan.at).toTimeString().slice(0,5)+".":S.plans[D]&&S.plans[D].uploadedAt?"Last upload "+upNice(S.plans[D].uploadedAt)+".":"")}));
+  {const lg=planLog(PL.sel);if(lg.length){const hm=iso=>{const t=new Date(iso);return pad(t.getHours())+":"+pad(t.getMinutes());};
     P.append(el("div",{class:"uplog"},el("b",{text:"Merged from "+lg.length+" upload"+(lg.length>1?"s":"")+": "}),...lg.map((u,i)=>el("span",{class:"uplg"},hm(u.at)+" "+(i?"+"+u.added+" new, "+u.updated+" updated":u.rows+" rows")))));}}
   if(!R.length){P.append(el("p",{class:"msg err",text:"No planned sites for "+(S.city==="All"?"any city":S.city)+" on this day."}));return;}
   const gs=GROUPS.filter(g=>R.some(r=>r.cg===g));
@@ -1539,6 +1539,16 @@ function planTab(P){
     {v:uniq(R0,r=>r.e),k:"Engineers (teams)"},{v:uniq(R0,r=>r.bk),k:"BKs"},{v:uniq(R0,r=>r.car),k:"Cars"},
     {v:R.filter(r=>/^p1$/i.test((r.pr||"").trim())).length,k:"P1 sites",cls:"c-pend"},{v:R.filter(r=>/sla/i.test(r.ct||"")).length,k:"FR-SLA sites"},
     {v:sum(R.map(r=>r.imp)),k:"Customers impacted"},{v:uniq(R,r=>r.tk),k:"HFT tickets"}])));
+  {const st=r=>status(r),done=R.filter(r=>st(r)==="ok"),pe=R.filter(r=>st(r)==="pend"),nu=R.filter(r=>st(r)==="none");
+   if(done.length||pe.length){
+     P.append(el("h3",{class:"subsec",text:"Progress (Backend Status in the planning"+(LIVE?", live":"")+")"}),el("div",{class:"smart"},
+       sm("✅",done.length+" / "+R.length,"Resolved",pct(done.length,R.length)+" of the plan done","good"),
+       sm("⏳",pe.length,"Pending",PKINDS.map(k=>[k,pe.filter(r=>pendKind({st:"pend",be:r.be})===k).length]).filter(x=>x[1]).map(x=>x[0].replace(" Pending","")+" "+x[1]).join(" · ")||"—",pe.length?"warn":"good"),
+       sm("🕒",nu.length,"Not updated yet","No Backend Status yet",nu.length?"warn":"good"),
+       ...gs.map(g=>{const a=R.filter(r=>r.cg===g),o=a.filter(r=>st(r)==="ok").length;return sm("•",o+" / "+a.length,g+" resolved",pct(o,a.length),"");})));
+     const ep=count(R,r=>r.e||"(no engineer)").map(([e])=>{const a=R.filter(r=>(r.e||"(no engineer)")===e);return{e,bk:[...new Set(a.map(r=>r.bk).filter(Boolean))].join(", "),n:a.length,ok:a.filter(r=>st(r)==="ok").length,pe:a.filter(r=>st(r)==="pend").length,nu:a.filter(r=>st(r)==="none").length};}).map(o=>(o.pct=Math.round(o.ok*100/o.n),o));
+     P.append(el("details",{class:"card",style:"margin-bottom:12px"},el("summary",{text:"Progress by engineer ("+ep.length+")"}),table([{key:"e",label:"Engineer",render:x=>el("b",{text:x.e})},{key:"bk",label:"BK"},{key:"n",label:"Planned",num:1},{key:"ok",label:"Resolved",num:1,cls:"c-ok"},{key:"pe",label:"Pending",num:1,cls:"c-pend"},{key:"nu",label:"Not updated",num:1},{key:"pct",label:"Done %",num:1,fmt:v=>v+"%"}],ep,{sort:"nu"})));
+   }}
   // smart boxes
   const withH=H.filter(x=>x.n),stillP=H.filter(x=>x.pr),reF=H.filter(x=>x.flags.some(f=>f[0]==="bad")),many=H.filter(x=>x.n>=3),same=H.filter(x=>x.flags.some(f=>f[0]==="same"));
   const planned=new Set(R.map(r=>(r.bx||"").trim().toUpperCase()));
@@ -1860,6 +1870,56 @@ function pendingTab(P){
   P.append(el("div",{class:"grid",style:"margin-top:16px"},card("Open pending by region / township","",table([{key:"name",label:"Region / township",render:x=>el("b",{text:x.name})},{key:"n",label:"Open",num:1,cls:"c-pend"},...PKINDS.filter(p=>open.some(x=>x.kind===p)).map(p=>({key:p,label:p.replace(" Pending",""),num:1})),{key:"d814",label:"8–14 days",num:1},{key:"over14",label:"Over 14 days",num:1,cls:"c-pend"},{key:"conf",label:"Confirmed",num:1}],byT,{sort:"n",empty:"No open pending sites."})),
     card("Open pending by age","",table([{key:"a",label:"Age",render:x=>el("b",{text:x.a})},{key:"n",label:"Sites",num:1}],["1 day","2–3 days","4–7 days","8–14 days","over 14 days"].map(a=>({a,n:open.filter(x=>aging(x.days)===a).length})),{}))));
 }
+
+/* ---------- Google Sheet (live) for CMA7-Special ---------- */
+const gsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:v;}catch(e){return d;}},gsSet=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+const GS={url:gsGet("fttx-gs-url",""),tabs:gsGet("fttx-gs-tabs",""),every:+gsGet("fttx-gs-every","0")||0,timer:null,busy:false,msg:"",err:false};
+function gsIds(u){const m=String(u||"").match(/spreadsheets\/d\/(e\/)?([A-Za-z0-9_-]+)/);if(!m)return null;const g=String(u).match(/[#&?]gid=(\d+)/);return{pub:!!m[1],id:m[2],gid:g?g[1]:null};}
+async function gsTry(url,asText){const r=await fetch(url,{cache:"no-store",redirect:"follow"});if(!r.ok)throw new Error("HTTP "+r.status);const ct=r.headers.get("content-type")||"";if(!asText&&/text\/html/i.test(ct))throw new Error("The sheet is not shared (got a sign-in page)");return asText?await r.text():await r.arrayBuffer();}
+async function gsFetch(){
+  // returns a list of {name, aoa}; tries the whole workbook first, then one CSV per tab
+  const ids=gsIds(GS.url);if(!ids)throw new Error("This does not look like a Google Sheets link.");
+  const base=ids.pub?"https://docs.google.com/spreadsheets/d/e/"+ids.id:"https://docs.google.com/spreadsheets/d/"+ids.id;
+  const errs=[];
+  try{const ab=await gsTry(ids.pub?base+"/pub?output=xlsx":base+"/export?format=xlsx");const wb=XLSX.read(ab,{type:"array"});return wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null})}));}catch(e){errs.push(e.message);}
+  const tabs=GS.tabs.split(",").map(t=>t.trim()).filter(Boolean),out=[];
+  const one=async(url,name)=>{const txt=await gsTry(url,true);if(/^\s*<!doctype html|<html/i.test(txt))throw new Error("The sheet is not shared (got a web page)");const wb=XLSX.read(txt,{type:"string",raw:true});out.push({name,aoa:XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null})});};
+  try{
+    if(ids.pub)await one(base+"/pub?output=csv"+(ids.gid?"&gid="+ids.gid:""),"Sheet");
+    else if(tabs.length){for(const t of tabs)await one(base+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(t),t);}
+    else await one(base+"/gviz/tq?tqx=out:csv"+(ids.gid?"&gid="+ids.gid:""),"Sheet");
+    return out;
+  }catch(e){errs.push(e.message);}
+  throw new Error(errs.join(" / "));
+}
+async function gsLoad(quiet){
+  if(GS.busy)return;GS.busy=true;if(!quiet){GS.msg="Loading from Google Sheet…";GS.err=false;if(S.tab==="plan")render();}
+  try{
+    const sheets=await gsFetch(),by={};let used=0;
+    for(const s of sheets){const rows=parseSheet(s.aoa);if(!rows||!rows.length)continue;used++;
+      const ygn=/yangon|ygn/i.test(s.name),sd=parseDate(s.name)||tdyStr();
+      rows.forEach(r=>{const g=String(r.r||"").trim().toUpperCase();r.cy=(ygn||YGN_REG.test(g))?"YGN":(g||String(r.tw||"").trim().toUpperCase()||"OTHER");const d=r._d||sd;(by[d]=by[d]||[]).push(r);});}
+    if(!used)throw new Error("No tab with an Engineer Name / Engineer 1 header row was found in the sheet.");
+    const ds=Object.keys(by).sort(),date=by[tdyStr()]?tdyStr():ds[ds.length-1];
+    S.livePlan={date,rows:by[date],at:new Date().toISOString(),tabs:used,dates:ds};
+    if(!PL.sel||PL.sel==="LIVE"||!quiet)PL.sel="LIVE";
+    GS.msg="Loaded "+by[date].length+" rows for "+nice(date)+" from "+used+" tab"+(used>1?"s":"")+" at "+new Date().toTimeString().slice(0,5)+(GS.every?" · refreshes every "+GS.every+" min":"");GS.err=false;
+  }catch(e){GS.msg="Could not load the Google Sheet: "+e.message+". Check that it is shared (Anyone with the link → Viewer) or published to the web, and open the portal from its GitHub link.";GS.err=true;}
+  GS.busy=false;if(S.tab==="plan")render();
+}
+function gsSchedule(){if(GS.timer){clearInterval(GS.timer);GS.timer=null;}if(GS.every>0&&GS.url)GS.timer=setInterval(()=>gsLoad(true),GS.every*60000);}
+function gsCard(){
+  const u=el("input",{type:"url",class:"findq",placeholder:"Paste the Google Sheet link (shared: Anyone with the link → Viewer, or Publish to web)",value:GS.url,"aria-label":"Google Sheet link"});
+  const t=el("input",{type:"text",class:"rptitle",style:"min-width:200px;flex:0 1 280px",placeholder:"Tab names, comma separated (only if needed)",value:GS.tabs,"aria-label":"Tab names"});
+  const ev=el("select",{class:"catsel","aria-label":"Auto refresh"});[[0,"Auto refresh: off"],[5,"Every 5 min"],[15,"Every 15 min"],[30,"Every 30 min"]].forEach(([v,l])=>{const o=el("option",{value:String(v),text:l});if(v===GS.every)o.selected=true;ev.append(o);});
+  const go=el("button",{class:"btn",type:"button",text:GS.busy?"Loading…":"⟳ Load from Google Sheet"});go.disabled=GS.busy;
+  const save=()=>{GS.url=u.value.trim();GS.tabs=t.value.trim();GS.every=+ev.value;gsSet("fttx-gs-url",GS.url);gsSet("fttx-gs-tabs",GS.tabs);gsSet("fttx-gs-every",String(GS.every));gsSchedule();};
+  go.addEventListener("click",()=>{save();gsLoad(false);});ev.addEventListener("change",()=>{save();if(GS.every&&GS.url&&!S.livePlan)gsLoad(false);});
+  const kids=[el("div",{class:"toolbar"},u,t,ev,go)];
+  if(GS.msg)kids.push(el("p",{class:GS.err?"msg err":"note",text:GS.msg}));
+  return card("🔴 Live from Google Sheet","The team plans and resolves in the Google Sheet; the portal reads it live (nothing is written to the sheet). The link is remembered on this device.",...kids);
+}
+gsSchedule();
 
 /* ---------- Site history ---------- */
 const ca1Of=r=>{const b=(r.bx||"").trim();if(/^CA1-/i.test(b))return b;const c=(r.c1||"").trim();return c||null;};
@@ -2218,7 +2278,7 @@ function onDocs(snap){
   const days={};
   Object.keys(by).forEach(d=>{const b=by[d];if(b.chunks.filter(Boolean).length<b.parts)return;days[d]={rows:b.chunks.flat(),parts:b.parts,file:b.file,uploadedAt:b.uploadedAt};});
   const plans={};Object.keys(pb).forEach(d=>{const b=pb[d];if(b.chunks.filter(Boolean).length<b.parts)return;plans[d]={rows:b.chunks.flat(),parts:b.parts,file:b.file,uploadedAt:b.uploadedAt};});
-  S.plans=plans;
+  if(!S.plans)S.plans={};   // CMA7-Special planning is not saved to the database; it lives only in this browser tab
   S.days=days;S.loaded=true;rebuild();
   if(!S.sel)S.sel=latest();
   render();
