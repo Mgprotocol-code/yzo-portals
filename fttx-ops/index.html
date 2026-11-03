@@ -1740,9 +1740,10 @@ function pendingTab(P){
   if(!PD.view0){PD.view0=1;if(tc.length)PD.view="toconfirm";}
   const lastRep=latest();
   P.append(el("p",{class:"ctx",text:"Every site that is still pending in the finished site-done reports (Backend Status contains “Pending”), recorded automatically from each daily upload and carried over until a later report shows it resolved. Use Confirm or Update to record what the team knows today."}));
-  const aging=d=>d<=1?"1 day":d<=3?"2–3 days":d<=7?"4–7 days":"over 7 days";
+  const aging=d=>d<=1?"1 day":d<=3?"2–3 days":d<=7?"4–7 days":d<=14?"8–14 days":"over 14 days";
   P.append(kpis([{v:open.length,k:"Open pending sites",cls:"c-pend"}].concat(PKINDS.filter(k=>open.some(x=>x.kind===k)).map(k=>({v:open.filter(x=>x.kind===k).length,k:k})),[
     {v:open.filter(x=>x.days>7).length,k:"Open over 7 days",cls:open.some(x=>x.days>7)?"c-pend":""},
+    {v:open.filter(x=>x.days>14).length,k:"Open over 14 days (2 weeks)",cls:open.some(x=>x.days>14)?"c-pend":""},
     {v:open.filter(x=>x.state==="confirmed").length,k:"Confirmed by the team"},
     {v:open.filter(x=>x.state==="open").length,k:"Not yet confirmed",cls:open.some(x=>x.state==="open")?"c-pend":""},
     {v:closed.length,k:"Closed by update (waiting for report)"},
@@ -1750,6 +1751,27 @@ function pendingTab(P){
     {v:res.length,k:"Resolved and confirmed (last 14 days)",cls:"c-ok"}])));
   if(tc.length&&PD.view!=="toconfirm"){const go=el("button",{class:"btn small",type:"button",text:"Review and confirm"});go.addEventListener("click",()=>{PD.view="toconfirm";PD.sel.clear();render();});
     P.append(el("div",{class:"issue bad",style:"margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"},el("b",{text:"✅ "+tc.length+" pending site"+(tc.length>1?"s were":" was")+" found resolved in a later report"}),el("span",{class:"note",text:"Same Box (H), Backend Status (AS) now resolved. Click to confirm each one."}),go));}
+  // ---- pending summary: type × age, exact status, group
+  {const AGES=[["1 day",0,1],["2–3 days",2,3],["4–7 days",4,7],["8–14 days",8,14],["Over 14 days",15,1e9]],ageOf=d=>AGES.find(a=>d>=a[1]&&d<=a[2])[0];
+   const kinds=PKINDS.filter(k=>open.some(x=>x.kind===k));
+   if(open.length){
+    const t=el("table",{class:"gtree"}),tb=el("tbody");
+    t.append(el("thead",{},el("tr",{},el("th",{text:"Pending type / Backend Status"}),...AGES.map(a=>el("th",{class:"num",text:a[0]})),el("th",{class:"num",text:"Total"}),el("th",{class:"num",text:"Share"}),el("th",{class:"num",text:"Oldest"}),el("th",{class:"num",text:"Confirmed"}))));
+    const line=(lab,a,cls)=>{const tr=el("tr",{class:cls});tr.append(el("td",{},lab));AGES.forEach(([n])=>{const v=a.filter(x=>ageOf(x.days)===n).length;tr.append(el("td",{class:"num"+(v&&n==="Over 14 days"?" c-pend":""),text:v||"·"}));});
+      tr.append(el("td",{class:"num big",text:String(a.length)}),el("td",{class:"num",text:pct(a.length,open.length)}),el("td",{class:"num",text:a.length?Math.max(...a.map(x=>x.days))+" d":"—"}),el("td",{class:"num",text:String(a.filter(x=>x.state==="confirmed").length)}));tb.append(tr);};
+    kinds.forEach(k=>{const a=open.filter(x=>x.kind===k);line(el("b",{},el("i",{class:"bdot",style:"background:var("+(STK.find(s=>s[0]===k)||[0,0,"--slate"])[2]+")"}),k),a,"reg");
+      count(a,x=>x.cur).forEach(([st])=>line(el("span",{class:"lv1",text:st}),a.filter(x=>x.cur===st),"twn d1"));});
+    line(el("b",{text:"Total"}),open,"tot");t.append(tb);
+    const g=el("div",{class:"grid"});
+    g.append(card("Pending summary: type and age","Open pending sites by Gov / Technical / Site Lease, the exact Backend Status (or the team’s latest update), and how long they have been pending",el("div",{class:"tblwrap"},t)));
+    g.append(card("Age of open pending","Each bar split by pending type; numbers are site counts",canvas("pdAge")));
+    P.append(g);
+    const gs=GROUPS.filter(gp=>open.some(x=>x.cg===gp)),gm=kinds.map(k=>{const o={k};gs.forEach(gp=>o[gp]=open.filter(x=>x.kind===k&&x.cg===gp).length);o.n=open.filter(x=>x.kind===k).length;return o;});
+    P.append(el("div",{class:"grid",style:"margin-top:16px"},card("Pending type by category group","",table([{key:"k",label:"Pending type",render:x=>el("b",{text:x.k})},...gs.map(gp=>({key:gp,label:gp,num:1})),{key:"n",label:"Total",num:1}],gm,{sort:"n"})),card("Pending type share","",canvas("pdPie"))));
+    const ds=AGES.map(a=>a[0]);
+    chart("pdAge",{type:"bar",plugins:[countLabels],data:{labels:ds.map(a=>a+" ("+open.filter(x=>ageOf(x.days)===a).length+")"),datasets:kinds.map(k=>{const counts=ds.map(a=>open.filter(x=>x.kind===k&&ageOf(x.days)===a).length);return{label:k,counts,data:counts,backgroundColor:css((STK.find(s=>s[0]===k)||[0,0,"--slate"])[2]),stack:"s"};})},options:{scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
+    chart("pdPie",{type:"pie",data:{labels:kinds.map(k=>k+" ("+open.filter(x=>x.kind===k).length+", "+pct(open.filter(x=>x.kind===k).length,open.length)+")"),datasets:[{data:kinds.map(k=>open.filter(x=>x.kind===k).length),backgroundColor:kinds.map(k=>css((STK.find(s=>s[0]===k)||[0,0,"--slate"])[2])),borderColor:css("--surface")}]},options:{plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}}}}});
+   }}
   // filters
   const bar=el("div",{class:"svbar"});
   const vseg=el("div",{class:"seg",role:"group","aria-label":"Show"});
@@ -1803,9 +1825,9 @@ function pendingTab(P){
   }
   drawT();
   // summary by type and township
-  const byT=count(open,x=>(x.rep.r||"")+" / "+(x.rep.tw||"(blank)")).map(([k])=>{const a=open.filter(x=>(x.rep.r||"")+" / "+(x.rep.tw||"(blank)")===k),o={name:k,n:a.length,over7:a.filter(x=>x.days>7).length,conf:a.filter(x=>x.state==="confirmed").length};PKINDS.forEach(p=>o[p]=a.filter(x=>x.kind===p).length);return o;});
-  P.append(el("div",{class:"grid",style:"margin-top:16px"},card("Open pending by region / township","",table([{key:"name",label:"Region / township",render:x=>el("b",{text:x.name})},{key:"n",label:"Open",num:1,cls:"c-pend"},...PKINDS.filter(p=>open.some(x=>x.kind===p)).map(p=>({key:p,label:p.replace(" Pending",""),num:1})),{key:"over7",label:"Over 7 days",num:1},{key:"conf",label:"Confirmed",num:1}],byT,{sort:"n",empty:"No open pending sites."})),
-    card("Open pending by age","",table([{key:"a",label:"Age",render:x=>el("b",{text:x.a})},{key:"n",label:"Sites",num:1}],["1 day","2–3 days","4–7 days","over 7 days"].map(a=>({a,n:open.filter(x=>aging(x.days)===a).length})),{}))));
+  const byT=count(open,x=>(x.rep.r||"")+" / "+(x.rep.tw||"(blank)")).map(([k])=>{const a=open.filter(x=>(x.rep.r||"")+" / "+(x.rep.tw||"(blank)")===k),o={name:k,n:a.length,d814:a.filter(x=>x.days>7&&x.days<=14).length,over14:a.filter(x=>x.days>14).length,conf:a.filter(x=>x.state==="confirmed").length};PKINDS.forEach(p=>o[p]=a.filter(x=>x.kind===p).length);return o;});
+  P.append(el("div",{class:"grid",style:"margin-top:16px"},card("Open pending by region / township","",table([{key:"name",label:"Region / township",render:x=>el("b",{text:x.name})},{key:"n",label:"Open",num:1,cls:"c-pend"},...PKINDS.filter(p=>open.some(x=>x.kind===p)).map(p=>({key:p,label:p.replace(" Pending",""),num:1})),{key:"d814",label:"8–14 days",num:1},{key:"over14",label:"Over 14 days",num:1,cls:"c-pend"},{key:"conf",label:"Confirmed",num:1}],byT,{sort:"n",empty:"No open pending sites."})),
+    card("Open pending by age","",table([{key:"a",label:"Age",render:x=>el("b",{text:x.a})},{key:"n",label:"Sites",num:1}],["1 day","2–3 days","4–7 days","8–14 days","over 14 days"].map(a=>({a,n:open.filter(x=>aging(x.days)===a).length})),{}))));
 }
 
 /* ---------- Site history ---------- */
