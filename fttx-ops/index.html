@@ -244,6 +244,7 @@ th.pk{color:var(--muted);font-weight:500}
 .gtree td .lv2 .tag{margin-left:4px}
 ul.under{margin:6px 0 8px;padding-left:18px;font-size:14px}ul.under li{margin:2px 0}
 .uplog{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:13px;margin:-4px 0 12px}.uplg{border:1px solid var(--line);border-radius:99px;padding:2px 9px;background:var(--surface)}
+.pdact{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-width:150px}.pdform{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;width:100%}
 @media (max-width:640px){.wrap{padding:14px 12px 40px}.kpi .v{font-size:26px}.chart{height:230px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -278,6 +279,7 @@ ul.under{margin:6px 0 8px;padding-left:18px;font-size:14px}ul.under li{margin:2p
   <nav class="tabs" role="tablist" id="tabs">
     <button role="tab" data-tab="daily">Dashboard</button>
     <button role="tab" data-tab="plan">📝 CMA7-Special</button>
+    <button role="tab" data-tab="pending">⏳ Pending</button>
     <button role="tab" data-tab="service">Service Time</button>
     <button role="tab" data-tab="qc">✅ QC-Status</button>
     <button role="tab" data-tab="trend">Trend</button>
@@ -576,7 +578,7 @@ function render(){
     P.append(el("div",{class:"empty"},el("h2",{text:"No daily reports yet"}),el("p",{text:"Upload the day’s planning-raw Excel file to start building the 30-day view."}),el("button",{class:"btn",type:"button",text:"Upload daily file"})));
     P.querySelector(".btn").addEventListener("click",()=>go("uploads"));return;
   }
-  ({daily,plan:planTab,qc:qcTab,service,summary,trend:trendTab,network,region,teams,ports,backend,rc,reports:reportsTab,uploads})[S.tab](P);
+  ({daily,plan:planTab,pending:pendingTab,qc:qcTab,service,summary,trend:trendTab,network,region,teams,ports,backend,rc,reports:reportsTab,uploads})[S.tab](P);
 }
 function go(tab){S.tab=tab;try{history.replaceState(null,"","#"+tab);}catch(e){}render();}
 
@@ -1696,6 +1698,116 @@ function qcTab(P){
     try{await dl.save({filename:"FTTx_QC_"+QC.from+(QC.from===QC.to?"":"_to_"+QC.to)+".xlsx",data:XLSX.write(wb,{bookType:"xlsx",type:"array"})});m.textContent="Saved.";}catch(e){m.textContent="Download cancelled.";}});
   P.append(el("div",{class:"toolbar",style:"margin-top:16px"},db,m));
 }
+/* ---------- Pending: every site still pending in the finished reports, with confirm / update ---------- */
+const PD={grp:"All",type:"All",view:"open",q:"",sel:new Set(),open:null};
+const isPendDoc=v=>!!v&&(v.kind==="pendupd"||String(v.file||"").startsWith("PEND|"));
+const isSideDoc=v=>isPlanDoc(v)||isPendDoc(v);
+const PD_STATUSES=["Resolved","Pending @ Gov","Pending @ Site Lease","Pending @ Ops","Visited Pending","Not Visited Pending","Cancelled / not needed"];
+function pdWho(){try{return localStorage.getItem("fttx-pend-who")||"";}catch(e){return"";}}
+async function savePendUpdates(list){
+  const cur=(S.pendUpd||[]).slice().concat(list).slice(-4000);
+  await S.db.doc("days/pendupd_0").set({kind:"pendupd",date:tdyStr(),part:0,parts:1,file:"PEND|updates",uploadedAt:new Date().toISOString(),rows:cur});
+  S.pendUpd=cur;
+}
+function pendingList(){
+  // one entry per box, from all saved finished reports (selected city, blank status left out)
+  const by=new Map();
+  ALL.forEach(r=>{if(!r.bx)return;const k=r.bx.trim().toUpperCase();if(!by.has(k))by.set(k,[]);by.get(k).push(r);});
+  const upd=new Map();(S.pendUpd||[]).forEach(u=>{const k=String(u.bx||"").toUpperCase();if(!upd.has(k))upd.set(k,[]);upd.get(k).push(u);});
+  const today=dnum(tdyStr()),out=[];
+  by.forEach((rows,k)=>{
+    rows.sort((a,b)=>a.t-b.t);
+    // the box's status on its latest report day (one per box per day: resolved wins)
+    const lastDay=rows[rows.length-1].d,dayRows=rows.filter(r=>r.d===lastDay),rep=dayRows.find(r=>r.st==="ok")||dayRows[dayRows.length-1];
+    const wasPending=rows.some(r=>r.st==="pend");if(!wasPending)return;
+    let first=null;
+    if(rep.st==="pend"){first=lastDay;const ds=[...new Set(rows.map(r=>r.d))].sort();for(let i=ds.length-1;i>=0;i--){const a=rows.filter(r=>r.d===ds[i]);if(a.some(r=>r.st==="ok"))break;if(a.some(r=>r.st==="pend"))first=ds[i];}}
+    const ups=(upd.get(k)||[]).filter(u=>u.src>=lastDay).sort((a,b)=>a.at<b.at?-1:1),lu=ups[ups.length-1]||null;
+    let state;
+    if(rep.st==="pend"){state=lu&&(/^resolved$/i.test(lu.status)||/^cancel/i.test(lu.status))?"closed":lu?"confirmed":"open";}
+    else{const prevP=rows.filter(r=>r.st==="pend").pop();if(prevP.d>=lastDay)return;   // pending and resolved on the same day: never carried over
+      const lt=latest();if(lt&&dnum(lt)-dnum(lastDay)>7)return;                         // older history: not asked again
+      // same Box (H) now has a resolved Backend Status (AS) in a later report: wait for the team to confirm it
+      const okU=ups.filter(u=>/^resolved \(confirmed\)$/i.test(u.status)).pop();
+      if(okU){if(today-dnum(okU.at.slice(0,10))>14)return;state="resolved";}else state="toconfirm";
+      first=prevP.d;}
+    out.push({k,bx:rep.bx,rep,rows,lastDay,first,days:first?today-dnum(first):0,state,lu,ups,cur:lu&&state!=="resolved"?lu.status:rep.be,kind:rep.st==="pend"?pendKind(lu&&/pending/i.test(lu.status)?{st:"pend",be:lu.status}:rep):null,cg:rep.cg});
+  });
+  return out.sort((a,b)=>b.days-a.days);
+}
+function pendingTab(P){
+  const L=pendingList(),open=L.filter(x=>x.state==="open"||x.state==="confirmed"),closed=L.filter(x=>x.state==="closed"),res=L.filter(x=>x.state==="resolved"),tc=L.filter(x=>x.state==="toconfirm");
+  if(!PD.view0){PD.view0=1;if(tc.length)PD.view="toconfirm";}
+  const lastRep=latest();
+  P.append(el("p",{class:"ctx",text:"Every site that is still pending in the finished site-done reports (Backend Status contains “Pending”), recorded automatically from each daily upload and carried over until a later report shows it resolved. Use Confirm or Update to record what the team knows today."}));
+  const aging=d=>d<=1?"1 day":d<=3?"2–3 days":d<=7?"4–7 days":"over 7 days";
+  P.append(kpis([{v:open.length,k:"Open pending sites",cls:"c-pend"}].concat(PKINDS.filter(k=>open.some(x=>x.kind===k)).map(k=>({v:open.filter(x=>x.kind===k).length,k:k})),[
+    {v:open.filter(x=>x.days>7).length,k:"Open over 7 days",cls:open.some(x=>x.days>7)?"c-pend":""},
+    {v:open.filter(x=>x.state==="confirmed").length,k:"Confirmed by the team"},
+    {v:open.filter(x=>x.state==="open").length,k:"Not yet confirmed",cls:open.some(x=>x.state==="open")?"c-pend":""},
+    {v:closed.length,k:"Closed by update (waiting for report)"},
+    {v:tc.length,k:"Resolved in a report, waiting for your confirmation",cls:tc.length?"c-pend":""},
+    {v:res.length,k:"Resolved and confirmed (last 14 days)",cls:"c-ok"}])));
+  if(tc.length&&PD.view!=="toconfirm"){const go=el("button",{class:"btn small",type:"button",text:"Review and confirm"});go.addEventListener("click",()=>{PD.view="toconfirm";PD.sel.clear();render();});
+    P.append(el("div",{class:"issue bad",style:"margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"},el("b",{text:"✅ "+tc.length+" pending site"+(tc.length>1?"s were":" was")+" found resolved in a later report"}),el("span",{class:"note",text:"Same Box (H), Backend Status (AS) now resolved. Click to confirm each one."}),go));}
+  // filters
+  const bar=el("div",{class:"svbar"});
+  const vseg=el("div",{class:"seg",role:"group","aria-label":"Show"});
+  [["toconfirm","✅ Resolved in report: confirm ("+tc.length+")"],["open","Open ("+open.length+")"],["closed","Closed by update ("+closed.length+")"],["resolved","Resolved and confirmed ("+res.length+")"],["all","All"]].forEach(([k,l])=>{const b=el("button",{type:"button","aria-pressed":String(PD.view===k),text:l});b.addEventListener("click",()=>{PD.view=k;PD.sel.clear();render();});vseg.append(b);});
+  const gseg=el("div",{class:"seg",role:"group","aria-label":"Group"});
+  ["All"].concat(GROUPS.filter(g=>L.some(x=>x.cg===g))).forEach(g=>{const b=el("button",{type:"button","aria-pressed":String(PD.grp===g),text:g==="All"?"All groups":g});b.addEventListener("click",()=>{PD.grp=g;render();});gseg.append(b);});
+  const tseg=el("div",{class:"seg",role:"group","aria-label":"Pending type"});
+  ["All"].concat(PKINDS.filter(k=>open.some(x=>x.kind===k))).forEach(k=>{const b=el("button",{type:"button","aria-pressed":String(PD.type===k),text:k==="All"?"All types":k.replace(" Pending","")});b.addEventListener("click",()=>{PD.type=k;render();});tseg.append(b);});
+  const q=el("input",{type:"search",placeholder:"Search box, township, engineer or BK",value:PD.q,"aria-label":"Search"});q.addEventListener("input",()=>{PD.q=q.value;drawT();});
+  bar.append(el("div",{class:"svrow"},el("span",{class:"note",text:"Show"}),vseg),el("div",{class:"svrow"},gseg,tseg,q));
+  P.append(bar);
+  // bulk actions
+  const who=el("input",{type:"text",class:"rptitle",style:"min-width:180px;flex:0 1 220px",placeholder:"Your name (saved on this device)",value:pdWho(),"aria-label":"Your name"});
+  who.addEventListener("change",()=>{try{localStorage.setItem("fttx-pend-who",who.value.trim());}catch(e){}});
+  const bc=el("button",{class:"btn",type:"button",text:PD.view==="toconfirm"?"✔ Confirm selected as resolved":"✔ Confirm selected (still pending)"}),bmsg=el("span",{class:"note",role:"status"});
+  bc.addEventListener("click",async()=>{const sel=L.filter(x=>PD.sel.has(x.k));if(!sel.length){bmsg.textContent="Tick the sites to confirm first.";return;}if(!S.db){bmsg.textContent="Saving is not available here.";return;}
+    bc.disabled=true;try{await savePendUpdates(sel.map(x=>x.state==="toconfirm"?{bx:x.bx,src:x.lastDay,at:new Date().toISOString(),by:who.value.trim(),status:"Resolved (confirmed)",note:"Report "+x.lastDay+": "+(x.rep.be||"")}:{bx:x.bx,src:x.lastDay,at:new Date().toISOString(),by:who.value.trim(),status:x.cur,note:"Confirmed still pending"}));PD.sel.clear();bmsg.textContent="Confirmed "+sel.length+" site"+(sel.length>1?"s":"")+".";setTimeout(render,500);}catch(e){bc.disabled=false;bmsg.textContent="Save failed: "+(e.message||e);}});
+  P.append(el("div",{class:"toolbar"},who,bc,bmsg));
+  const host=el("div");P.append(host);
+  function drawT(){
+    host.textContent="";const qq=PD.q.toLowerCase();
+    const src=PD.view==="toconfirm"?tc:PD.view==="open"?open:PD.view==="closed"?closed:PD.view==="resolved"?res:L;
+    const rows=src.filter(x=>(PD.grp==="All"||x.cg===PD.grp)&&(PD.type==="All"||x.kind===PD.type)&&(!qq||[x.bx,x.rep.tw,x.rep.e,x.rep.bk,x.rep.cat].join(" ").toLowerCase().includes(qq)));
+    const allCb=el("input",{type:"checkbox","aria-label":"Select all shown"});allCb.checked=rows.length&&rows.every(x=>PD.sel.has(x.k));
+    allCb.addEventListener("change",()=>{rows.forEach(x=>allCb.checked?PD.sel.add(x.k):PD.sel.delete(x.k));drawT();});
+    const t=table([
+      {key:"sel",label:"",render:x=>{if(x.state==="resolved")return"";const c=el("input",{type:"checkbox","aria-label":"Select "+x.bx});c.checked=PD.sel.has(x.k);c.addEventListener("change",()=>{c.checked?PD.sel.add(x.k):PD.sel.delete(x.k);});return c;}},
+      {key:"bx",label:"Box",sortVal:x=>x.bx,render:x=>el("div",{},el("b",{text:x.bx}),el("div",{},el("span",{class:"gtag",style:"--gc:var("+GCOL[x.cg]+")",text:x.cg})))},
+      {key:"cat",label:"Category",sortVal:x=>x.rep.cat,render:x=>el("div",{},el("div",{text:x.rep.cat||""}),el("div",{class:"note",text:[x.rep.pr,x.rep.ct].filter(Boolean).join(", ")}))},
+      {key:"tw",label:"Township",sortVal:x=>x.rep.tw,render:x=>(x.rep.tw||"")+(x.rep.r&&x.rep.r!==x.rep.tw?" ("+x.rep.r+")":"")},
+      {key:"days",label:"Pending since",num:1,sortVal:x=>x.days,render:x=>{const done=x.state==="resolved"||x.state==="toconfirm";return el("div",{},el("b",{class:!done&&x.days>7?"c-pend":"",text:done?nice(x.first)+" → "+nice(x.lastDay):x.days+" d"}),el("div",{class:"note",text:done?(dnum(x.lastDay)-dnum(x.first))+" d pending, resolved "+nice(x.lastDay):"since "+nice(x.first)}));}},
+      {key:"cur",label:"Status",sortVal:x=>x.cur,render:x=>el("div",{},x.state==="toconfirm"?tag("ok","Report "+nice(x.lastDay)+": "+x.rep.be):x.state==="resolved"?tag("ok",x.rep.be+" ("+nice(x.lastDay)+")"):x.state==="closed"?tag("ok",x.cur+" (update)"):tag("pend",x.cur),el("div",{class:"note",text:"Report "+nice(x.lastDay)+": "+(x.rep.be||"")}))},
+      {key:"why",label:"Reason (report)",cls:"reason",sortVal:x=>reasonOf(x.rep),render:x=>reasonOf(x.rep)||"—"},
+      {key:"e",label:"Engineer / BK",sortVal:x=>x.rep.e,render:x=>el("div",{},el("div",{text:x.rep.e||"—"}),el("div",{class:"note",text:x.rep.bk?"BK "+x.rep.bk:""}))},
+      {key:"lu",label:"Last update",sortVal:x=>x.lu&&x.lu.at,render:x=>x.lu?el("div",{},el("div",{text:x.lu.status}),el("div",{class:"note",text:upNice(x.lu.at)+" "+new Date(x.lu.at).toTimeString().slice(0,5)+(x.lu.by?" · "+x.lu.by:"")}),x.lu.note?el("div",{class:"note",text:x.lu.note}):null):x.state==="resolved"?"":tag("rep","Not confirmed")},
+      {key:"act",label:"Action",render:x=>{if(x.state==="resolved")return"";const box=el("div",{class:"pdact"});
+        if(x.state==="toconfirm"){const ok=el("button",{class:"btn small",type:"button",text:"✔ Confirm resolved"});ok.addEventListener("click",async()=>{ok.disabled=true;try{await savePendUpdates([{bx:x.bx,src:x.lastDay,at:new Date().toISOString(),by:who.value.trim(),status:"Resolved (confirmed)",note:"Report "+x.lastDay+": "+(x.rep.be||"")}]);setTimeout(render,400);}catch(e){ok.disabled=false;alert("Save failed: "+(e.message||e));}});
+          const fixBy=x.rep.e?el("div",{class:"note",text:"Resolved by "+x.rep.e+": "+fixText(x.rep)}):null;box.append(ok,fixBy);return box;}
+        const cf=el("button",{class:"btn ghost small",type:"button",text:"✔ Confirm"});cf.addEventListener("click",async()=>{cf.disabled=true;try{await savePendUpdates([{bx:x.bx,src:x.lastDay,at:new Date().toISOString(),by:who.value.trim(),status:x.cur,note:"Confirmed still pending"}]);setTimeout(render,400);}catch(e){cf.disabled=false;alert("Save failed: "+(e.message||e));}});
+        const up=el("button",{class:"btn small",type:"button",text:"✎ Update"});up.addEventListener("click",()=>{PD.open=PD.open===x.k?null:x.k;drawT();});
+        box.append(cf,up);
+        if(PD.open===x.k){const st=el("select",{class:"catsel","aria-label":"New status"});PD_STATUSES.forEach(s=>{const o=el("option",{value:s,text:s});if(s===x.cur)o.selected=true;st.append(o);});
+          const nt=el("input",{type:"text",class:"rptitle",style:"min-width:160px",placeholder:"Note (what was done / why)","aria-label":"Note"});
+          const sv=el("button",{class:"btn small",type:"button",text:"Save"});sv.addEventListener("click",async()=>{sv.disabled=true;try{await savePendUpdates([{bx:x.bx,src:x.lastDay,at:new Date().toISOString(),by:who.value.trim(),status:st.value,note:nt.value.trim()}]);PD.open=null;setTimeout(render,400);}catch(e){sv.disabled=false;alert("Save failed: "+(e.message||e));}});
+          box.append(el("div",{class:"pdform"},st,nt,sv));}
+        if(x.ups.length>1){const d=el("details",{},el("summary",{text:x.ups.length+" updates"}));const ul=el("ul",{class:"vis"});x.ups.slice().reverse().forEach(u=>ul.append(el("li",{text:upNice(u.at)+" "+new Date(u.at).toTimeString().slice(0,5)+" · "+u.status+(u.by?" · "+u.by:"")+(u.note?" · "+u.note:"")})));d.append(ul);box.append(d);}
+        return box;}}
+    ],rows,{sort:"days",empty:PD.view==="open"?"No open pending sites. 👍":PD.view==="toconfirm"?"Nothing waiting for confirmation. 👍":"Nothing to show."});
+    t.querySelector("thead th").append(allCb);
+    host.append(el("div",{class:"grid"},card(PD.view==="toconfirm"?"Resolved in a later report: confirm ("+rows.length+")":PD.view==="open"?"Open pending sites ("+rows.length+")":PD.view==="closed"?"Closed by a team update ("+rows.length+")":PD.view==="resolved"?"Resolved and confirmed (last 14 days) ("+rows.length+")":"All ("+rows.length+")","Status = Backend Status in the latest report, or the team’s update if it is newer. A newer report always wins over an older update.",t)));
+  }
+  drawT();
+  // summary by type and township
+  const byT=count(open,x=>(x.rep.r||"")+" / "+(x.rep.tw||"(blank)")).map(([k])=>{const a=open.filter(x=>(x.rep.r||"")+" / "+(x.rep.tw||"(blank)")===k),o={name:k,n:a.length,over7:a.filter(x=>x.days>7).length,conf:a.filter(x=>x.state==="confirmed").length};PKINDS.forEach(p=>o[p]=a.filter(x=>x.kind===p).length);return o;});
+  P.append(el("div",{class:"grid",style:"margin-top:16px"},card("Open pending by region / township","",table([{key:"name",label:"Region / township",render:x=>el("b",{text:x.name})},{key:"n",label:"Open",num:1,cls:"c-pend"},...PKINDS.filter(p=>open.some(x=>x.kind===p)).map(p=>({key:p,label:p.replace(" Pending",""),num:1})),{key:"over7",label:"Over 7 days",num:1},{key:"conf",label:"Confirmed",num:1}],byT,{sort:"n",empty:"No open pending sites."})),
+    card("Open pending by age","",table([{key:"a",label:"Age",render:x=>el("b",{text:x.a})},{key:"n",label:"Sites",num:1}],["1 day","2–3 days","4–7 days","over 7 days"].map(a=>({a,n:open.filter(x=>aging(x.days)===a).length})),{}))));
+}
+
 /* ---------- Site history ---------- */
 const ca1Of=r=>{const b=(r.bx||"").trim();if(/^CA1-/i.test(b))return b;const c=(r.c1||"").trim();return c||null;};
 const ca2Of=r=>{const b=(r.bx||"").trim();return /^CA2-/i.test(b)?b:null;};
@@ -2039,7 +2151,7 @@ async function writeDay(date,rows,file){
 async function deleteDay(date){
   if(S.cloud){
     // delete every part of that day in one go, and check that rows were really removed
-    const {data,error}=await S.cloud.from("fttx_days").delete().eq("date",date).not("file","like","PLAN|%").select("id");
+    const {data,error}=await S.cloud.from("fttx_days").delete().eq("date",date).not("file","like","PLAN|%").not("file","like","PEND|%").select("id");
     if(error)throw error;
     if(!data||!data.length)throw new Error("Nothing was deleted. The Supabase table fttx_days does not allow deleting without sign-in yet (see the setup note).");
     cloudSoon();return;
@@ -2048,6 +2160,7 @@ async function deleteDay(date){
 function onDocs(snap){
   const by={},pb={};
   snap.docs.forEach(d=>{const v=d.data();if(!v||!v.date||!Array.isArray(v.rows))return;
+    if(isPendDoc(v)){S.pendUpd=v.rows.slice();return;}
     if(isPlanDoc(v)){(pb[v.date]=pb[v.date]||{parts:v.parts||1,file:String(v.file||"").replace(/^PLAN\|/,""),uploadedAt:v.uploadedAt,chunks:[]}).chunks[v.part||0]=v.rows;return;}(by[v.date]=by[v.date]||{parts:v.parts||1,file:v.file,uploadedAt:v.uploadedAt,chunks:[]}).chunks[v.part||0]=v.rows;});
   const days={};
   Object.keys(by).forEach(d=>{const b=by[d];if(b.chunks.filter(Boolean).length<b.parts)return;days[d]={rows:b.chunks.flat(),parts:b.parts,file:b.file,uploadedAt:b.uploadedAt};});
@@ -2068,7 +2181,7 @@ document.querySelectorAll("#themeSeg button").forEach(b=>b.addEventListener("cli
 document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.tab)));
 $("#goUpload").addEventListener("click",()=>go("uploads"));
 $("#goReports").addEventListener("click",()=>go("reports"));
-let h=(location.hash||"").slice(1);if(h==="summary")h="daily";if(["daily","plan","qc","service","trend","network","region","teams","backend","reports","uploads"].includes(h))S.tab=h;
+let h=(location.hash||"").slice(1);if(h==="summary")h="daily";if(["daily","plan","pending","qc","service","trend","network","region","teams","backend","reports","uploads"].includes(h))S.tab=h;
 render();
 let rT;window.addEventListener("resize",()=>{clearTimeout(rT);rT=setTimeout(()=>{if(S.loaded)render();},250);});
 const mq=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");if(mq&&mq.addEventListener)mq.addEventListener("change",()=>S.loaded&&render());
@@ -2091,13 +2204,13 @@ async function cloudReload(){
   const {data,error}=await S.cloud.from("fttx_days").select("date,part,parts,file,uploaded_at,rows").order("date").limit(1000);
   if(error){S.loaded=true;render();$("#panel").prepend(el("p",{class:"msg err",text:"Saved days could not be loaded ("+error.message+"). Reload to try again."}));return;}
   let docs=data.map(r=>({date:r.date,part:r.part,parts:r.parts,file:r.file,uploadedAt:r.uploaded_at,rows:r.rows}));
-  S.seedOnly=!docs.filter(v=>!isPlanDoc(v)).length;
-  if(S.seedOnly)docs=docs.filter(isPlanDoc).concat(seedDocs());
+  S.seedOnly=!docs.filter(v=>!isSideDoc(v)).length;
+  if(S.seedOnly)docs=docs.filter(isSideDoc).concat(seedDocs());
   else if(!S.seedMerged){
     // days built into this file that are newer than anything in the database (or a newer copy of the latest day) are added once
-    S.seedMerged=true;const top=docs.filter(v=>!isPlanDoc(v)).reduce((m,v)=>v.date>m?v.date:m,""),have=new Map(docs.filter(v=>!isPlanDoc(v)).map(v=>[v.date+"_"+(v.part||0),v]));
+    S.seedMerged=true;const top=docs.filter(v=>!isSideDoc(v)).reduce((m,v)=>v.date>m?v.date:m,""),have=new Map(docs.filter(v=>!isSideDoc(v)).map(v=>[v.date+"_"+(v.part||0),v]));
     const add=seedDocs().filter(v=>{const h=have.get(v.date+"_"+(v.part||0));return v.date>top||(h&&(h.uploadedAt||"")<(v.uploadedAt||""));});
-    if(add.length){add.forEach(v=>{const k=v.date+"_"+(v.part||0);have.set(k,v);});docs=[...have.values()].concat(docs.filter(isPlanDoc));
+    if(add.length){add.forEach(v=>{const k=v.date+"_"+(v.part||0);have.set(k,v);});docs=[...have.values()].concat(docs.filter(isSideDoc));
       Promise.all(add.map(v=>S.cloud.from("fttx_days").upsert(toRow(v.date+"_"+(v.part||0),v)))).then(()=>cloudSoon()).catch(()=>{});}
   }
   onDocs({docs:docs.map(v=>({data:()=>v}))});
