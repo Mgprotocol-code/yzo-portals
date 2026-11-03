@@ -437,7 +437,7 @@ function teamType(t){t=(t||"").trim();if(!t)return "(no team)";const m=t.match(/
 const tsort=(a,b)=>{const i=TEAM_ORDER.indexOf(a),j=TEAM_ORDER.indexOf(b);return (i<0?99:i)-(j<0?99:j)||a.localeCompare(b);};
 function catGroup(c){c=c||"";if(/box\s*maint|badexp|relocation/i.test(c))return"Box-Maint";if(/complain/i.test(c))return"Complaint";if(/activity|olt[\s\-_]*sfp/i.test(c))return"Activity";if(/(ca1|ca2)\s*(broken|high\s*loss)|no\s*link/i.test(c))return"Site Down";return"Other";}
 // Backend Status (AS): contains "pending" = pending; blank = no status; anything else = resolved
-function status(r){const b=(r.be||"").toLowerCase().trim();if(!b)return "none";if(/pending/.test(b))return "pend";return "ok";}
+function status(r){const b=(r.be||"").toLowerCase().trim();if(!b)return "none";if(/pending|in\s*progress/.test(b))return "pend";return "ok";}
 const allDates=()=>Object.keys(S.days).sort();
 const dates=()=>allDates().filter(hasDay);
 const latest=()=>{const d=dates();return d[d.length-1]||null;};
@@ -602,7 +602,7 @@ function groupChart(id,R){
   chart(id,{type:"bar",data:{labels:gs,datasets:[["Resolved","ok","--green"],["Pending","pend","--red"]].map(([l,k,c])=>({label:l,data:gs.map(g=>R.filter(r=>r.cg===g&&r.st===k).length),backgroundColor:css(c),stack:"s"}))},options:{scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
 }
 /* ---------- pending kinds, one status per box, % charts with counts ---------- */
-function pendKind(r){if(r.st!=="pend")return null;const b=(r.be||"").toLowerCase();if(/gov/.test(b))return"Gov Pending";if(/site\s*lease/.test(b))return"Site Lease Pending";if(/visited|ops|technical/.test(b))return"Technical Pending";return"Other pending";}
+function pendKind(r){if(r.st!=="pend")return null;const b=(r.be||"").toLowerCase();if(/in\s*progress/.test(b))return"In progress";if(/gov/.test(b))return"Gov Pending";if(/site\s*lease/.test(b))return"Site Lease Pending";if(/visited|ops|technical/.test(b))return"Technical Pending";return"Other pending";}
 const PKINDS=["Gov Pending","Technical Pending","Site Lease Pending","Other pending"];
 const STK=[["Resolved",r=>r.st==="ok","--green"],["Gov Pending",r=>pendKind(r)==="Gov Pending","--red"],["Technical Pending",r=>pendKind(r)==="Technical Pending","--orange"],["Site Lease Pending",r=>pendKind(r)==="Site Lease Pending","--yellow"],["Other pending",r=>pendKind(r)==="Other pending","--brown"],["No status",r=>r.st==="none","--slate"]];
 // one row per Box 1 name: Resolved wins, then any status, then blank
@@ -1542,13 +1542,15 @@ function planTab(P){
     {v:sum(R.map(r=>r.imp)),k:"Customers impacted"},{v:uniq(R,r=>r.tk),k:"HFT tickets"}])));
   {const st=r=>status(r),done=R.filter(r=>st(r)==="ok"),pe=R.filter(r=>st(r)==="pend"),nu=R.filter(r=>st(r)==="none");
    if(done.length||pe.length){
+     const ip=pe.filter(r=>/in\s*progress/i.test(r.be||""));
      P.append(el("h3",{class:"subsec",text:"Progress (Backend Status in the planning"+(LIVE?", live":"")+")"}),el("div",{class:"smart"},
        sm("✅",done.length+" / "+R.length,"Resolved",pct(done.length,R.length)+" of the plan done","good"),
-       sm("⏳",pe.length,"Pending",PKINDS.map(k=>[k,pe.filter(r=>pendKind({st:"pend",be:r.be})===k).length]).filter(x=>x[1]).map(x=>x[0].replace(" Pending","")+" "+x[1]).join(" · ")||"—",pe.length?"warn":"good"),
+       sm("🔧",ip.length,"In progress","Team on site now",ip.length?"warn":""),
+       sm("⏳",pe.length-ip.length,"Pending",PKINDS.map(k=>[k,pe.filter(r=>!/in\s*progress/i.test(r.be||"")&&pendKind({st:"pend",be:r.be})===k).length]).filter(x=>x[1]).map(x=>x[0].replace(" Pending","")+" "+x[1]).join(" · ")||"—",pe.length?"warn":"good"),
        sm("🕒",nu.length,"Not updated yet","No Backend Status yet",nu.length?"warn":"good"),
        ...gs.map(g=>{const a=R.filter(r=>r.cg===g),o=a.filter(r=>st(r)==="ok").length;return sm("•",o+" / "+a.length,g+" resolved",pct(o,a.length),"");})));
-     const ep=count(R,r=>r.e||"(no engineer)").map(([e])=>{const a=R.filter(r=>(r.e||"(no engineer)")===e);return{e,bk:[...new Set(a.map(r=>r.bk).filter(Boolean))].join(", "),n:a.length,ok:a.filter(r=>st(r)==="ok").length,pe:a.filter(r=>st(r)==="pend").length,nu:a.filter(r=>st(r)==="none").length};}).map(o=>(o.pct=Math.round(o.ok*100/o.n),o));
-     P.append(el("details",{class:"card",style:"margin-bottom:12px"},el("summary",{text:"Progress by engineer ("+ep.length+")"}),table([{key:"e",label:"Engineer",render:x=>el("b",{text:x.e})},{key:"bk",label:"BK"},{key:"n",label:"Planned",num:1},{key:"ok",label:"Resolved",num:1,cls:"c-ok"},{key:"pe",label:"Pending",num:1,cls:"c-pend"},{key:"nu",label:"Not updated",num:1},{key:"pct",label:"Done %",num:1,fmt:v=>v+"%"}],ep,{sort:"nu"})));
+     const ep=count(R,r=>r.e||"(no engineer)").map(([e])=>{const a=R.filter(r=>(r.e||"(no engineer)")===e);return{e,bk:[...new Set(a.map(r=>r.bk).filter(Boolean))].join(", "),n:a.length,ok:a.filter(r=>st(r)==="ok").length,ip:a.filter(r=>/in\s*progress/i.test(r.be||"")).length,pe:a.filter(r=>st(r)==="pend"&&!/in\s*progress/i.test(r.be||"")).length,nu:a.filter(r=>st(r)==="none").length};}).map(o=>(o.pct=Math.round(o.ok*100/o.n),o));
+     P.append(el("details",{class:"card",style:"margin-bottom:12px"},el("summary",{text:"Progress by engineer ("+ep.length+")"}),table([{key:"e",label:"Engineer",render:x=>el("b",{text:x.e})},{key:"bk",label:"BK"},{key:"n",label:"Planned",num:1},{key:"ok",label:"Resolved",num:1,cls:"c-ok"},{key:"ip",label:"In progress",num:1},{key:"pe",label:"Pending",num:1,cls:"c-pend"},{key:"nu",label:"Not updated",num:1},{key:"pct",label:"Done %",num:1,fmt:v=>v+"%"}],ep,{sort:"nu"})));
    }}
   // smart boxes
   const withH=H.filter(x=>x.n),stillP=H.filter(x=>x.pr),reF=H.filter(x=>x.flags.some(f=>f[0]==="bad")),many=H.filter(x=>x.n>=3),same=H.filter(x=>x.flags.some(f=>f[0]==="same"));
@@ -1875,23 +1877,27 @@ function pendingTab(P){
 
 /* ---------- Google Sheet (live) for CMA7-Special ---------- */
 const gsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:v;}catch(e){return d;}},gsSet=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
-const GS={url:gsGet("fttx-gs-url",""),tabs:gsGet("fttx-gs-tabs",""),every:+gsGet("fttx-gs-every","0")||0,timer:null,busy:false,msg:"",err:false};
+const GS_DEFAULT={url:"https://docs.google.com/spreadsheets/d/108jdjbzcx_UJintsqT9koyBK6trQefS7SHuzazQsw-4/edit?gid=281626907#gid=281626907",tabs:"Today YGN, Today Regional",every:15};
+// older settings that only named "Today YGN" also read "Today Regional"
+const gsTabsFix=t=>String(t||"").trim().toLowerCase()==="today ygn"?"Today YGN, Today Regional":(t||"");
+const GS={url:gsGet("fttx-gs-url",GS_DEFAULT.url),tabs:gsTabsFix(gsGet("fttx-gs-tabs",GS_DEFAULT.tabs)),every:+gsGet("fttx-gs-every",String(GS_DEFAULT.every))||0,timer:null,busy:false,msg:"",err:false};
 function gsIds(u){const m=String(u||"").match(/spreadsheets\/d\/(e\/)?([A-Za-z0-9_-]+)/);if(!m)return null;const g=String(u).match(/[#&?]gid=(\d+)/);return{pub:!!m[1],id:m[2],gid:g?g[1]:null};}
 async function gsTry(url,asText){const r=await fetch(url,{cache:"no-store",redirect:"follow"});if(!r.ok)throw new Error("HTTP "+r.status);const ct=r.headers.get("content-type")||"";if(!asText&&/text\/html/i.test(ct))throw new Error("The sheet is not shared (got a sign-in page)");return asText?await r.text():await r.arrayBuffer();}
 async function gsFetch(){
-  // returns a list of {name, aoa}; tries the whole workbook first, then one CSV per tab
+  // returns a list of {name, aoa}: the named tabs (CSV), else the linked tab, else the whole workbook
   const ids=gsIds(GS.url);if(!ids)throw new Error("This does not look like a Google Sheets link.");
   const base=ids.pub?"https://docs.google.com/spreadsheets/d/e/"+ids.id:"https://docs.google.com/spreadsheets/d/"+ids.id;
-  const errs=[];
-  try{const ab=await gsTry(ids.pub?base+"/pub?output=xlsx":base+"/export?format=xlsx");const wb=XLSX.read(ab,{type:"array"});return wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null})}));}catch(e){errs.push(e.message);}
-  const tabs=GS.tabs.split(",").map(t=>t.trim()).filter(Boolean),out=[];
-  const one=async(url,name)=>{const txt=await gsTry(url,true);if(/^\s*<!doctype html|<html/i.test(txt))throw new Error("The sheet is not shared (got a web page)");const wb=XLSX.read(txt,{type:"string",raw:true});out.push({name,aoa:XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null})});};
+  const errs=[],out=[],tabs=GS.tabs.split(",").map(t=>t.trim()).filter(Boolean);
+  const one=async(url,name)=>{const txt=await gsTry(url,true);if(/^\s*<!doctype html|<html/i.test(txt))throw new Error("the sheet is not shared (got a web page)");const wb=XLSX.read(txt,{type:"string",raw:true});out.push({name,aoa:XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null})});};
   try{
-    if(ids.pub)await one(base+"/pub?output=csv"+(ids.gid?"&gid="+ids.gid:""),"Sheet");
-    else if(tabs.length){for(const t of tabs)await one(base+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(t),t);}
-    else await one(base+"/gviz/tq?tqx=out:csv"+(ids.gid?"&gid="+ids.gid:""),"Sheet");
-    return out;
-  }catch(e){errs.push(e.message);}
+    if(ids.pub)await one(base+"/pub?output=csv"+(ids.gid?"&gid="+ids.gid:""),tabs[0]||"Sheet");
+    else if(tabs.length){for(const t of tabs)await one(base+"/gviz/tq?tqx=out:csv&headers=0&sheet="+encodeURIComponent(t),t);}
+    else if(ids.gid)await one(base+"/gviz/tq?tqx=out:csv&headers=0&gid="+ids.gid,"Sheet");
+    if(out.length)return out;
+  }catch(e){errs.push(e.message);out.length=0;}
+  try{const ab=await gsTry(ids.pub?base+"/pub?output=xlsx":base+"/export?format=xlsx");const wb=XLSX.read(ab,{type:"array"});
+    const names=tabs.length?wb.SheetNames.filter(n=>tabs.some(t=>t.toLowerCase()===n.toLowerCase())):wb.SheetNames;
+    return (names.length?names:wb.SheetNames).map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null})}));}catch(e){errs.push(e.message);}
   throw new Error(errs.join(" / "));
 }
 async function gsLoad(quiet){
@@ -1899,8 +1905,8 @@ async function gsLoad(quiet){
   try{
     const sheets=await gsFetch(),by={};let used=0;
     for(const s of sheets){const rows=parseSheet(s.aoa);if(!rows||!rows.length)continue;used++;
-      const ygn=/yangon|ygn/i.test(s.name),sd=parseDate(s.name)||tdyStr();
-      rows.forEach(r=>{const g=String(r.r||"").trim().toUpperCase();r.cy=(ygn||YGN_REG.test(g))?"YGN":(g||String(r.tw||"").trim().toUpperCase()||"OTHER");const d=r._d||sd;(by[d]=by[d]||[]).push(r);});}
+      const ygn=/yangon|ygn/i.test(s.name),sd=/today/i.test(s.name)?tdyStr():(parseDate(s.name)||tdyStr());
+      rows.forEach(r=>{const g=String(r.r||"").trim().toUpperCase();r.cy=(ygn||YGN_REG.test(g))?"YGN":(g||String(r.tw||"").trim().toUpperCase()||"OTHER");const d=/today/i.test(s.name)?sd:(r._d||sd);(by[d]=by[d]||[]).push(r);});}
     if(!used)throw new Error("No tab with an Engineer Name / Engineer 1 header row was found in the sheet.");
     const ds=Object.keys(by).sort(),date=by[tdyStr()]?tdyStr():ds[ds.length-1];
     S.livePlan={date,rows:by[date],at:new Date().toISOString(),tabs:used,dates:ds};
@@ -1912,8 +1918,8 @@ async function gsLoad(quiet){
 function gsSchedule(){if(GS.timer){clearInterval(GS.timer);GS.timer=null;}if(GS.every>0&&GS.url)GS.timer=setInterval(()=>gsLoad(true),GS.every*60000);}
 function gsApplyCfg(){
   const c=S.cfg||{};if(!c.gsUrl)return;
-  const changed=c.gsUrl!==GS.url||(c.gsTabs||"")!==GS.tabs||(+c.gsEvery||0)!==GS.every;
-  GS.url=c.gsUrl;GS.tabs=c.gsTabs||"";GS.every=+c.gsEvery||0;gsSchedule();
+  const changed=c.gsUrl!==GS.url||gsTabsFix(c.gsTabs||"")!==GS.tabs||(+c.gsEvery||0)!==GS.every;
+  GS.url=c.gsUrl;GS.tabs=gsTabsFix(c.gsTabs||"");GS.every=+c.gsEvery||0;gsSchedule();
   if(changed||!S.livePlan){if(S.tab==="plan"||!S.livePlan)gsLoad(true);}
 }
 async function gsSaveCfg(url,tabs,every){
