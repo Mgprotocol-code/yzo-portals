@@ -1736,9 +1736,13 @@ function pendingList(){
   return out.sort((a,b)=>b.days-a.days);
 }
 function pendingTab(P){
-  const L=pendingList(),open=L.filter(x=>x.state==="open"||x.state==="confirmed"),closed=L.filter(x=>x.state==="closed"),res=L.filter(x=>x.state==="resolved"),tc=L.filter(x=>x.state==="toconfirm");
+  // attention is only for Site Down and Box-Maint; other groups can be shown with the switch
+  const PD_ATT=["Site Down","Box-Maint"],L0=pendingList(),L=PD.others?L0:L0.filter(x=>PD_ATT.includes(x.cg)),nOther=L0.filter(x=>!PD_ATT.includes(x.cg)&&(x.state==="open"||x.state==="confirmed")).length;
+  if(PD.grp!=="All"&&!L.some(x=>x.cg===PD.grp))PD.grp="All";
+  const open=L.filter(x=>x.state==="open"||x.state==="confirmed"),closed=L.filter(x=>x.state==="closed"),res=L.filter(x=>x.state==="resolved"),tc=L.filter(x=>x.state==="toconfirm");
   if(!PD.view0){PD.view0=1;if(tc.length)PD.view="toconfirm";}
   const lastRep=latest();
+  P.append(el("p",{class:"note",style:"margin:0 0 6px;font-weight:600",text:PD.others?"Showing every category group.":"Attention: Site Down and Box-Maint only. "+nOther+" open pending site"+(nOther===1?"":"s")+" in other groups (Activity, Complaint, Other) are hidden."}));
   P.append(el("p",{class:"ctx",text:"Every site that is still pending in the finished site-done reports (Backend Status contains “Pending”), recorded automatically from each daily upload and carried over until a later report shows it resolved. Use Confirm or Update to record what the team knows today."}));
   const aging=d=>d<=1?"1 day":d<=3?"2–3 days":d<=7?"4–7 days":d<=14?"8–14 days":"over 14 days";
   P.append(kpis([{v:open.length,k:"Open pending sites",cls:"c-pend"}].concat(PKINDS.filter(k=>open.some(x=>x.kind===k)).map(k=>({v:open.filter(x=>x.kind===k).length,k:k})),[
@@ -1772,6 +1776,32 @@ function pendingTab(P){
     chart("pdAge",{type:"bar",plugins:[countLabels],data:{labels:ds.map(a=>a+" ("+open.filter(x=>ageOf(x.days)===a).length+")"),datasets:kinds.map(k=>{const counts=ds.map(a=>open.filter(x=>x.kind===k&&ageOf(x.days)===a).length);return{label:k,counts,data:counts,backgroundColor:css((STK.find(s=>s[0]===k)||[0,0,"--slate"])[2]),stack:"s"};})},options:{scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
     chart("pdPie",{type:"pie",data:{labels:kinds.map(k=>k+" ("+open.filter(x=>x.kind===k).length+", "+pct(open.filter(x=>x.kind===k).length,open.length)+")"),datasets:[{data:kinds.map(k=>open.filter(x=>x.kind===k).length),backgroundColor:kinds.map(k=>css((STK.find(s=>s[0]===k)||[0,0,"--slate"])[2])),borderColor:css("--surface")}]},options:{plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}}}}});
    }}
+  // ---- separate summaries for Site Down and Box-Maint
+  {const AG=[["1 day",0,1],["2–3 d",2,3],["4–7 d",4,7],["8–14 d",8,14],["Over 14 d",15,1e9]],ag=d=>AG.find(a=>d>=a[1]&&d<=a[2])[0];
+   const sec=el("div",{class:"grid",style:"margin-top:16px"});
+   ["Site Down","Box-Maint"].forEach(gname=>{
+     const a=open.filter(x=>x.cg===gname),t=tc.filter(x=>x.cg===gname),body=el("div");
+     if(!a.length&&!t.length){body.append(el("p",{class:"note",text:"No open pending "+gname+" sites. 👍"}));sec.append(card(gname,"",body));return;}
+     const kinds=PKINDS.filter(k=>a.some(x=>x.kind===k));
+     body.append(el("div",{class:"smart"},
+       sm("⏳",a.length,"Open pending",kinds.map(k=>k.replace(" Pending","")+" "+a.filter(x=>x.kind===k).length).join(" · ")||"—",a.length?"warn":"good"),
+       sm("🔴",a.filter(x=>x.days>14).length,"Over 14 days (2 weeks)",a.filter(x=>x.days>7&&x.days<=14).length+" more at 8–14 days",a.some(x=>x.days>14)?"bad":"good"),
+       sm("📅",a.length?Math.max(...a.map(x=>x.days))+" d":"—","Oldest",a.length?a.slice().sort((p,q)=>q.days-p.days)[0].bx:"",""),
+       sm("✅",t.length,"Resolved in a report, to confirm","",t.length?"warn":"good")));
+     const tt=el("table",{class:"gtree"}),tb=el("tbody");
+     tt.append(el("thead",{},el("tr",{},el("th",{text:"Type / category"}),...AG.map(x=>el("th",{class:"num",text:x[0]})),el("th",{class:"num",text:"Total"}))));
+     const line=(lab,b,cls)=>{const tr=el("tr",{class:cls});tr.append(el("td",{},lab));AG.forEach(([n])=>{const v=b.filter(x=>ag(x.days)===n).length;tr.append(el("td",{class:"num"+(v&&n==="Over 14 d"?" c-pend":""),text:v||"·"}));});tr.append(el("td",{class:"num big",text:String(b.length)}));tb.append(tr);};
+     kinds.forEach(k=>{const b=a.filter(x=>x.kind===k);line(el("b",{},el("i",{class:"bdot",style:"background:var("+(STK.find(s=>s[0]===k)||[0,0,"--slate"])[2]+")"}),k),b,"reg");
+       count(b,x=>x.rep.cat||"(blank)").sort(byCatOrder).forEach(([c])=>line(el("span",{class:"lv1",text:c}),b.filter(x=>(x.rep.cat||"(blank)")===c),"twn d1"));});
+     if(a.length)line(el("b",{text:"Total"}),a,"tot");
+     tt.append(tb);body.append(el("div",{class:"tblwrap"},tt));
+     const tw=count(a,x=>x.rep.tw||"(blank)").slice(0,6),bk=count(a,x=>x.rep.bk||"(no BK)").slice(0,5);
+     body.append(el("p",{class:"note",style:"margin-top:8px",text:"Townships: "+(tw.map(x=>x[0]+" "+x[1]).join(", ")||"—")}),el("p",{class:"note",text:"BK: "+(bk.map(x=>x[0]+" "+x[1]).join(", ")||"—")}));
+     const top=a.slice().sort((p,q)=>q.days-p.days).slice(0,5);
+     if(top.length){const ul=el("ul",{class:"under"});top.forEach(x=>ul.append(el("li",{},el("b",{text:x.bx}),document.createTextNode(" · "+(x.rep.tw||"")+" · "+x.cur+" · "+x.days+" d"+(reasonOf(x.rep)?" · "+reasonOf(x.rep):"")))));body.append(el("details",{open:""},el("summary",{text:"Oldest "+top.length}),ul));}
+     sec.append(card(gname+" pending","Open sites by pending type, category and age",body));
+   });
+   P.append(el("h2",{class:"sec",text:"Site Down and Box-Maint, separately"}),sec);}
   // filters
   const bar=el("div",{class:"svbar"});
   const vseg=el("div",{class:"seg",role:"group","aria-label":"Show"});
@@ -1781,7 +1811,8 @@ function pendingTab(P){
   const tseg=el("div",{class:"seg",role:"group","aria-label":"Pending type"});
   ["All"].concat(PKINDS.filter(k=>open.some(x=>x.kind===k))).forEach(k=>{const b=el("button",{type:"button","aria-pressed":String(PD.type===k),text:k==="All"?"All types":k.replace(" Pending","")});b.addEventListener("click",()=>{PD.type=k;render();});tseg.append(b);});
   const q=el("input",{type:"search",placeholder:"Search box, township, engineer or BK",value:PD.q,"aria-label":"Search"});q.addEventListener("input",()=>{PD.q=q.value;drawT();});
-  bar.append(el("div",{class:"svrow"},el("span",{class:"note",text:"Show"}),vseg),el("div",{class:"svrow"},gseg,tseg,q));
+  const oc=el("input",{type:"checkbox"});oc.checked=!!PD.others;oc.addEventListener("change",()=>{PD.others=oc.checked;PD.sel.clear();render();});
+  bar.append(el("div",{class:"svrow"},el("span",{class:"note",text:"Show"}),vseg),el("div",{class:"svrow"},gseg,tseg,q,el("label",{class:"note"},oc,"Also show other groups (no attention needed)")));
   P.append(bar);
   // bulk actions
   const who=el("input",{type:"text",class:"rptitle",style:"min-width:180px;flex:0 1 220px",placeholder:"Your name (saved on this device)",value:pdWho(),"aria-label":"Your name"});
